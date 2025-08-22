@@ -3,13 +3,10 @@
 
 # Desarrollo de Aplicaciones IoT | WebApp
 
-# 📌 Proyecto IoT - Ciudad Inteligente  
+# 📌 Proyecto IoT - Ciudad Inteligente   
 
-Este repositorio corresponde al **Repositorio Front-End** del proyecto académico de la Tecnicatura en Telecomunicaciones orientada a IoT del ISPC.  
-El objetivo es desarrollar una **interfaz web moderna y responsiva** que permita visualizar la información de la ciudad inteligente de forma clara, intuitiva y accesible. 
-
-Este repositorio corresponde al módulo Front-End del proyecto académico de la Tecnicatura en Telecomunicaciones del ISPC - Orientación IoT.
-El objetivo principal es desarrollar una interfaz web responsiva que permita visualizar información proveniente de una infraestructura IoT aplicada a una ciudad inteligente.
+Este repositorio corresponde al módulo **Front-End** del proyecto académico de la Tecnicatura en Telecomunicaciones del ISPC - Orientación IoT.
+El objetivo principal es **desarrollar una interfaz web responsiva** que permita visualizar información proveniente de una infraestructura IoT aplicada a una ciudad inteligente.
 
 ---
 
@@ -37,7 +34,7 @@ Para el desarrollo del Front-End, se pueden utilizar diferentes stacks de tecnol
  
 ---
 
-📊 Alcance del Proyecto
+## 📊 Alcance del Proyecto
 
 El sistema contempla la visualización de:
 🚦 Estado del tráfico vehicular.
@@ -50,7 +47,8 @@ Acceso multiplataforma (Web, PWA, Mobile).
 
 ---
 
-## 📂 Estructura del Repositorio (TENTATIVO, PUEDE TENER MODIFICACIONES DURANTE EL DESARROLLO DEL PROYECTO)
+## 📂 Estructura del Repositorio 
+### (TENTATIVO, PUEDE TENER MODIFICACIONES DURANTE EL DESARROLLO DEL PROYECTO)
 
 ```bash
 📦 frontend-ciudad-inteligente
@@ -64,11 +62,6 @@ Acceso multiplataforma (Web, PWA, Mobile).
  ┣ 📜 package.json      # Dependencias del proyecto
  ┣ 📜 README.md         # Documentación principal
  ┗ 📜 .gitignore        # Archivos a excluir del control de versiones
+```
 
-
-
-
-
-
-
-
+##
