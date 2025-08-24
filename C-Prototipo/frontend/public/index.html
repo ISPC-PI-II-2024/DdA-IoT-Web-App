@@ -1,23 +1,49 @@
 <!doctype html>
 <html lang="es">
 <head>
+  <!-- ==========================
+       META / PWA / ESTILOS
+       ========================== -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#111111" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" href="/icons/icon-192.png" />
-  <title>Vamos a ver que nombre lleva el proyecto</title>
-  <script defer src="/src/app.js"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-</head>
+  <link rel="icon" href="/icons/image.jpg" />
+  <link rel="stylesheet" href="/style.css" />
+  <title>C-Prototipo</title>
 
+  <!-- ==========================
+       CONFIG RUNTIME (inyectable por Docker más adelante)
+       Para dev local, hardcodeamos valores de prueba.
+       En prod, este bloque se puede reemplazar por fetch(/config.json)
+       ========================== -->
+  <script>
+    window.__CONFIG = {
+      API_URL: "http://localhost:3000/api",
+      WS_URL: "ws://localhost:3000/ws",
+      GOOGLE_CLIENT_ID: "REEMPLAZAR_EN_PASO_2",
+      ROLES: { ADMIN: "admin", ACTION: "action", READONLY: "readonly", GUEST: "guest" }
+    };
+  </script>
+
+  <!-- (Paso 2) GIS: <script src="https://accounts.google.com/gsi/client" async defer></script> -->
+  <script type="module" src="/src/app.js"></script>
+</head>
 <body>
-  <div id="app"></div>
+  <!-- ==========================
+       SHELL DE LA APLICACIÓN (App Shell)
+       Header (navbar) + contenedor principal de vistas
+       ========================== -->
+  <header id="navbar-root"></header>
+  <main id="app" class="container"></main>
+
+  <!-- ==========================
+       SERVICE WORKER (PWA)
+       ========================== -->
   <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(console.error);
     }
   </script>
 </body>
-
 </html>
