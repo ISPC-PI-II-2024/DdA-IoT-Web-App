@@ -13,7 +13,7 @@ const schema = Joi.object({
   // Seguridad JWT propia
   JWT_SECRET: Joi.string().min(24).required(),
   JWT_EXPIRES_IN: Joi.string().default("15m"),
-  REFRESH_EXPIRES_IN: Joi.string().default("7d"), // reservado por si luego usás refresh cookies
+  REFRESH_EXPIRES_IN: Joi.string().default("7d"), // reservado para posibles cookies
 
   // Google Identity Services
   GOOGLE_CLIENT_ID: Joi.string().required(),
@@ -21,7 +21,7 @@ const schema = Joi.object({
   // CORS
   CORS_ORIGIN: Joi.string().default("*"),
 
-  // Listas blancas para roles
+  // Listas blancas para roles (en el env dentro de backend, coloquen su gmail personal)
   ADMIN_WHITELIST: Joi.string().allow("").default(""),
   ACTION_WHITELIST: Joi.string().allow("").default("")
 }).unknown();

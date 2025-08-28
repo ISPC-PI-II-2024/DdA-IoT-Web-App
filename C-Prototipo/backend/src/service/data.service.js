@@ -1,26 +1,13 @@
 // --------------------------------------------------------------------
-// Rutas relacionadas con la gestion de datos
+// Servicio de datos y operaciones relacionadas
 // --------------------------------------------------------------------
 
 // IMPORTACIONES
-import { Router } from "express";
-import { requireAuth } from "../middlewares/auth.middlewares.js";
-
+import { pool } from "../db/index.js";
 
 // --------------------------------------------------------------------
 // FUNCIONES
 // --------------------------------------------------------------------
-const router = Router();
-
-
 
 
 // EXPORTACION
-export default router;
-
-
-
-
-
-
-

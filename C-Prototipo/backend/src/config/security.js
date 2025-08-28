@@ -1,6 +1,6 @@
 // ==========================
 // Helmet + políticas básicas
-// Nota: La CSP fina la definís en el reverse-proxy (Paso 4).
+// Nota: La CSP fina la definís en el reverse-proxy
 // ==========================
 import helmet from "helmet";
 

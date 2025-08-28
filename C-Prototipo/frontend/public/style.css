@@ -1,50 +1,315 @@
-/* ======== Reset/vars ======== */
+/* =========================
+   Variables de color y fuentes (Arg)
+========================= */
 :root {
-  --bg: #0f1115;
-  --panel: #171a21;
-  --text: #eaeef2;
-  --muted: #9aa4b2;
-  --accent: #46a0ff;
-  --danger: #ff5a7a;
-  --ok: #38d39f;
+  --color-fondo: #f5f6fa;
+  --color-primario: #1a237e;  
+  --color-secundario: #1565c0; 
+  --color-acento: #00bcd4;     
+  --color-texto: #222;
+  --color-navbar: #212121;
+  --color-footer: #23272f;
+  --color-blanco: #fff;
+  --color-gris: #b0bec5;
+  --color-link: #1976d2;
+  --color-error: #d32f2f;
+  --color-exito: #388e3c;
+  --color-sombra: rgba(33,33,33,0.08);
+
+  --ancho-maximo: 1120px;
+  --alto-navbar: 56px;
+  --alto-footer: 90px;
+  --fuente: "Roboto", Arial, Helvetica, sans-serif;
 }
-* { box-sizing: border-box; }
-html, body { height: 100%; }
-body {
+
+/* =========================
+   Reset y base
+========================= */
+* {
+  box-sizing: border-box;
   margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  color: var(--text);
-  background: linear-gradient(180deg, #0b0d12 0%, var(--bg) 100%);
+  padding: 0;
+}
+html, body {
+  height: 100%;
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font-family: var(--fuente);
+}
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* ======== Layout ======== */
-.container { padding: 1rem; max-width: 1200px; margin: 0 auto; }
-
+/* =========================
+   Navbar fijo arriba
+========================= */
 .navbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: .75rem 1rem; background: var(--panel); border-bottom: 1px solid #242b36;
-  position: sticky; top: 0; z-index: 10;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--alto-navbar);
+  background: var(--color-navbar);
+  color: var(--color-blanco);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2em;
+  z-index: 1000;
+  box-shadow: 0 2px 8px var(--color-sombra);
 }
-.navbar .brand { font-weight: 700; letter-spacing: .3px; }
-.navbar nav a {
-  color: var(--text); text-decoration: none; margin: 0 .5rem; opacity: .85;
+.navbar-logo {
+  font-size: 1.3em;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--color-blanco);
 }
-.navbar nav a.active { color: var(--accent); }
-.navbar .right { display: flex; gap: .5rem; align-items: center; }
-.badge { padding: .2rem .5rem; border: 1px solid #2b3341; border-radius: .5rem; color: var(--muted); }
-.btn {
-  background: #1f2430; color: var(--text); border: 1px solid #2b3341; border-radius: .6rem;
-  padding: .4rem .75rem; cursor: pointer;
+.navbar-nav {
+  display: flex;
+  gap: 1.3em;
 }
-.btn:hover { border-color: var(--accent); }
+.navbar-nav a {
+  color: var(--color-blanco);
+  text-decoration: none;
+  font-weight: 500;
+  opacity: 0.92;
+  transition: opacity 0.18s;
+}
+.navbar-nav a.active,
+.navbar-nav a:hover {
+  opacity: 1;
+  border-bottom: 2px solid var(--color-acento);
+}
 
-/* ======== Panels / Cards ======== */
+.navbar-user {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 1em;
+}
+.navbar-user .usuario {
+  font-size: 1em;
+  font-weight: 500;
+  color: var(--color-blanco);
+}
+.navbar-user .btn-logout,
+.navbar-user .btn-login {
+  background: var(--color-acento);
+  color: var(--color-blanco);
+  border: none;
+  padding: 0.45em 1em;
+  border-radius: 20px;
+  font-size: 0.98em;
+  cursor: pointer;
+  margin-left: 0.5em;
+  transition: background 0.2s;
+}
+.navbar-user .btn-logout:hover,
+.navbar-user .btn-login:hover {
+  background: var(--color-secundario);
+}
+
+/* =========================
+   Main/cuerpo centralizado
+========================= */
+#app, main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: var(--alto-navbar);
+  margin-bottom: var(--alto-footer);
+  min-height: calc(100vh - var(--alto-navbar) - var(--alto-footer));
+  width: 100%;
+}
+.contenedor-principal {
+  width: 100%;
+  max-width: var(--ancho-maximo);
+  padding: 2em 1.5em 1.5em 1.5em;
+  background: var(--color-blanco);
+  box-shadow: 0 2px 16px var(--color-sombra);
+  border-radius: 10px;
+  margin: 2.2em 0 1.5em 0;
+}
+
+/* =========================
+   Footer fijo al fondo, solo visible al scrollear
+========================= */
+.footer {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: var(--alto-footer);
+  background: var(--color-footer);
+  color: #bbb;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.2em 0 0.6em 0;
+  z-index: 900;
+  font-size: 0.97em;
+  box-shadow: 0 -2px 8px var(--color-sombra);
+}
+.footer-content {
+  width: 100%;
+  max-width: var(--ancho-maximo);
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2em;
+}
+.footer-sitemap, .footer-social, .footer-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.footer-sitemap a {
+  color: var(--color-acento);
+  text-decoration: none;
+  margin: 0 0 0.6em 0;
+  font-size: 1em;
+}
+.footer-sitemap a:hover {
+  text-decoration: underline;
+}
+.footer-social {
+  margin-top: 0.5em;
+  gap: 0.6em;
+}
+.footer-social a img {
+  width: 26px;
+  opacity: 0.84;
+  margin-right: 0.5em;
+  vertical-align: middle;
+  transition: opacity 0.15s;
+}
+.footer-social a img:hover {
+  opacity: 1;
+}
+.footer-copy {
+  font-size: 0.92em;
+  color: #aaa;
+}
+
+/* =========================
+   Formularios (login, usuario)
+========================= */
+.form-login, .form-usuario {
+  width: 100%;
+  max-width: 400px;
+  margin: 3em auto 2em auto;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 10px var(--color-sombra);
+  padding: 2.2em 1.6em 1.5em 1.6em;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1em;
+}
+.form-login label,
+.form-login input {
+  font-size: 1em;
+}
+.form-login input {
+  padding: 0.65em 1em;
+  border: 1px solid var(--color-gris);
+  border-radius: 5px;
+  background: #f4f7fa;
+  outline: none;
+  transition: border 0.15s;
+}
+.form-login input:focus {
+  border: 1.5px solid var(--color-acento);
+}
+.form-login .error-msg {
+  color: var(--color-error);
+  font-size: 0.95em;
+  margin-top: 0.5em;
+  text-align: left;
+}
+.form-login .btn {
+  background: var(--color-primario);
+  color: var(--color-blanco);
+  border: none;
+  border-radius: 5px;
+  padding: 0.7em 1.1em;
+  font-size: 1.04em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.form-login .btn:hover {
+  background: var(--color-acento);
+}
+
+/* =========================
+   Utilitarios y helpers visuales
+========================= */
+.boton {
+  background: var(--color-acento);
+  color: var(--color-blanco);
+  border: none;
+  padding: 0.5em 1.3em;
+  border-radius: 6px;
+  font-size: 1.05em;
+  cursor: pointer;
+  margin: 0.7em 0.4em;
+  transition: background 0.17s;
+}
+.boton:hover {
+  background: var(--color-secundario);
+}
+
+a, .link {
+  color: var(--color-link);
+  text-decoration: underline dotted;
+  cursor: pointer;
+}
+
+.titulo-principal {
+  font-size: 2.1em;
+  color: var(--color-primario);
+  margin-bottom: 0.7em;
+  font-weight: 700;
+}
+.titulo-secundario {
+  font-size: 1.35em;
+  color: var(--color-secundario);
+  margin-bottom: 0.6em;
+  font-weight: 500;
+}
+
 .card {
-  background: var(--panel); border: 1px solid #242b36; border-radius: .8rem; padding: 1rem; margin: .75rem 0;
+  background: #fff;
+  border-radius: 9px;
+  box-shadow: 0 1px 9px var(--color-sombra);
+  padding: 1.3em;
+  margin: 1em 0;
 }
-.grid { display: grid; gap: 1rem; }
-.grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (max-width: 900px) { .grid.cols-2 { grid-template-columns: 1fr; } }
 
-.muted { color: var(--muted); }
-hr.sep { border: none; border-top: 1px solid #242b36; margin: 1rem 0; }
+/* =========================
+   Responsive
+========================= */
+@media (max-width: 800px) {
+  .footer-content, .contenedor-principal {
+    flex-direction: column;
+    gap: 1.1em;
+    padding: 1.2em 0.7em;
+  }
+  .navbar {
+    padding: 0 1em;
+  }
+}
+@media (max-width: 600px) {
+  .navbar-logo {
+    font-size: 1.08em;
+  }
+  .footer {
+    font-size: 0.92em;
+    height: 68px;
+    padding: 0.8em 0 0.5em 0;
+  }
+  .contenedor-principal {
+    padding: 1.1em 0.6em;
+  }
+}

@@ -1,8 +1,8 @@
-// ==========================
+// ====================================================================
 // Servidor Express base + WebSocket en /ws
-// - Mantiene lo que ya tenías: helmet, cors, morgan, /api, /health
+// - Tiene helmet, cors, morgan, /api, /health
 // - Inicia HTTP server y llama initWebSocket(server)
-// ==========================
+// ====================================================================
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
@@ -11,6 +11,7 @@ import { ENV } from "./config/env.js";
 import { security } from "./config/security.js";
 import { createServer } from "http";
 import authRoutes from "./routes/auth.routes.js";
+import dataRoutes from './routes/data.routes.js';
 import { initWebSocket } from "./sw/index.js";
 
 const app = express();
@@ -30,6 +31,7 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 
 // API
 app.use("/api/auth", authRoutes);
+app.use('/api', dataRoutes);
 
 // HTTP server + WS
 const server = createServer(app);
@@ -37,5 +39,5 @@ initWebSocket(server);
 
 // Arranque
 server.listen(ENV.PORT, () => {
-  console.log(`✅ HTTP+WS listening on http://localhost:${ENV.PORT}  (ws path: /ws)`);
+  console.log(`HTTP+WS listening on http://localhost:${ENV.PORT}  (ws path: /ws)`);
 });

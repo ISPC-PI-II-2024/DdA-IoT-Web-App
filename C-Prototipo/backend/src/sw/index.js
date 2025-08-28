@@ -46,7 +46,7 @@ export function publish(topic, payload) {
 export function initWebSocket(httpServer) {
   const wss = new WebSocketServer({ noServer: true });
 
-  // Upgrade: autenticar token del querystring (?token=)
+  // autenticar token del querystring (?token=)
   httpServer.on("upgrade", async (req, socket, head) => {
     const { pathname, query } = url.parse(req.url, true);
     if (pathname !== "/ws") return; // no manejamos otros paths aquí
@@ -118,11 +118,13 @@ export function initWebSocket(httpServer) {
 
   wss.on("close", () => clearInterval(interval));
 
-  // ======= DEMO FEED: publica un valor seno cada 1s en "metrics/demo" =======
+  // ======= publica un valor seno cada 1s en "metrics/demo" =======
+  // De momento no reacciona, queda seguir probando
+  
   let t = 0;
   setInterval(() => {
     const value = Math.sin(t / 10) * 50 + 50 + Math.random() * 5; // 0..~105
-    publish("metrics/demo", { value });
+    publish("metricas/demo", { value });
     t++;
   }, 1000);
 
