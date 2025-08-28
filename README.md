@@ -1,12 +1,20 @@
-# EN CONSTRUCCION:
-
-
 # Desarrollo de Aplicaciones IoT | WebApp
 
-# 📌 Proyecto IoT - Ciudad Inteligente   
+![Estado](https://img.shields.io/badge/Estado-En%20Desarrollo-yellow)
+![Versión](https://img.shields.io/badge/Versi%C3%B3n-1.0.0-blue)
+![Licencia](https://img.shields.io/badge/Licencia-MIT-green)
 
-Este repositorio corresponde al módulo **Front-End** del proyecto académico de la Tecnicatura en Telecomunicaciones del ISPC - Orientación IoT.
-El objetivo principal es **desarrollar una interfaz web responsiva** que permita visualizar información proveniente de una infraestructura IoT aplicada a una ciudad inteligente.
+# 📌 Proyecto IoT - Ciudad Inteligente
+
+Este repositorio alberga el módulo **Front-End** del proyecto académico de la Tecnicatura en Telecomunicaciones del ISPC - Orientación IoT. Nuestro objetivo es crear una plataforma web moderna e intuitiva que sirva como interfaz para monitorear y gestionar una infraestructura IoT en el contexto de una ciudad inteligente.
+
+## 🌟 Características Principales
+
+- **Monitoreo en Tiempo Real**: Visualización instantánea de datos de sensores
+- **Diseño Responsivo**: Interfaz adaptable a cualquier dispositivo
+- **Arquitectura Moderna**: Desarrollado con las últimas tecnologías web
+- **Seguridad Integrada**: Autenticación y autorización robusta
+- **Escalabilidad**: Diseñado para crecer con las necesidades de la ciudad
 
 ---
 
@@ -64,4 +72,68 @@ Acceso multiplataforma (Web, PWA, Mobile).
  ┗ 📜 .gitignore        # Archivos a excluir del control de versiones
 ```
 
-##
+---
+
+## � Instalación y Configuración
+
+1. **Clonar el repositorio**
+   ```bash
+   git clone https://github.com/ISPC-PI-II-2024/DdA-IoT-Web-App.git
+   cd DdA-IoT-Web-App
+   ```
+
+2. **Instalar dependencias**
+   ```bash
+   # Frontend
+   cd frontend
+   npm install
+
+   # Backend
+   cd ../backend
+   npm install
+   ```
+
+3. **Configurar variables de entorno**
+   - Crea un archivo `.env` en la carpeta `backend` siguiendo el ejemplo de `.env.example`
+   - Configura las credenciales necesarias
+
+4. **Iniciar la aplicación**
+   ```bash
+   # Frontend (en una terminal)
+   cd frontend
+   npm start
+
+   # Backend (en otra terminal)
+   cd backend
+   npm start
+   ```
+
+## 💻 Requisitos Previos
+
+- Node.js >= 14.x
+- npm >= 6.x
+- Docker (opcional, para contenedores)
+- Un navegador web moderno
+
+## 🤝 Contribuir
+
+1. Fork el repositorio
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## �👥 Equipo
+
+| Nombre                         | GitHub                                 |
+|--------------------------------|----------------------------------------|
+| Vittorio Durigutti             | [@vittoriodurigutti](https://github.com/vittoriodurigutti) |
+| Jose Luis Marquez              | [@marquezjose](https://github.com/marquezjose) |
+| Luciano Lujan                  | [@lucianoilujan](https://github.com/lucianoilujan) |
+| Romina Vanesa Huk              | [@RoHu17](https://github.com/RoHu17) |
+| Paola Natalia Alejandra Pantoja| [@PaolaaPantoja](https://github.com/PaolaaPantoja) |
+| Juan Diego Gonzalez Antoniazzi | [@JDGA1997](https://github.com/JDGA1997) |
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT - vea el archivo [LICENSE](LICENSE) para más detalles.
