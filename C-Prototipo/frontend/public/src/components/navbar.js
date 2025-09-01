@@ -3,6 +3,7 @@
 // - Links visibles según permisos
 // - Slot derecho: usuario + logout (cuando hay sesión)
 // ==========================
+
 import { el } from "../utils/dom.js";
 import { getState, subscribe, logout, ROLES_CONST } from "../state/store.js";
 

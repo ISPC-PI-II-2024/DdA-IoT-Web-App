@@ -3,6 +3,7 @@
 // - Dibuja últimos N puntos de un tópico RT
 // - Optimiza con requestAnimationFrame
 // ==========================
+
 import { el } from "../utils/dom.js";
 import { rtClient } from "../ws.js";
 

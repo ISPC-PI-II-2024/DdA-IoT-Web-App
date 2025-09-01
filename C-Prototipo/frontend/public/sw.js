@@ -3,11 +3,8 @@
 // - Precache de shell mínimo
 // - Runtime cache GET (network-first con fallback a cache)
 // ==========================
-const CACHE = "shell-v1";
-const ASSETS = [
-  "/", "/index.html", "/style.css",
-  "/manifest.webmanifest"
-];
+const CACHE = "shell-v2";
+const ASSETS = ["/", "/index.html", "/style.css", "/manifest.webmanifest"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -21,14 +18,26 @@ self.addEventListener("activate", e => {
   );
 });
 
+// network-first con fallback a cache, evitando cachear errores y /config.json
 self.addEventListener("fetch", e => {
-  const { request } = e;
-  if (request.method !== "GET" || request.url.startsWith("chrome-extension:")) return;
-  e.respondWith(
-    fetch(request).then(resp => {
-      const copy = resp.clone();
-      caches.open(CACHE).then(c => c.put(request, copy));
-      return resp;
-    }).catch(() => caches.match(request).then(r => r || caches.match("/index.html")))
-  );
+  const req = e.request;
+  if (req.method !== "GET" || req.url.startsWith("chrome-extension:")) return;
+
+  // Nunca cachear config.json (siempre a red, sin almacenar)
+  if (new URL(req.url).pathname === "/config.json") {
+    e.respondWith(fetch(req).catch(() => new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } })));
+    return;
+  }
+
+  e.respondWith((async () => {
+    try {
+      const net = await fetch(req);
+      // Cachear solo respuestas OK
+      if (net.ok) caches.open(CACHE).then(c => c.put(req, net.clone()));
+      return net;
+    } catch {
+      const cached = await caches.match(req);
+      return cached || caches.match("/index.html");
+    }
+  })());
 });
