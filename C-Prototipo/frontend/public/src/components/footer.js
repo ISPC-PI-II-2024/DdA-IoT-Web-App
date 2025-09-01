@@ -22,13 +22,12 @@ export function renderFooter() {
     </div>
   `;
 
-  // Redes sociales/contacto (puedes personalizar los enlaces)
+  // Redes sociales/contacto
   const social = `
     <div class="footer-social">
-      <a href="mailto:contacto@miempresa.com" title="Email"><img src="assets/mail.svg" alt="Email"></a>
-      <a href="https://wa.me/123456789" target="_blank" title="WhatsApp"><img src="assets/whatsapp.svg" alt="WhatsApp"></a>
-      <a href="https://linkedin.com/in/tuempresa" target="_blank" title="LinkedIn"><img src="assets/linkedin.svg" alt="LinkedIn"></a>
-      <a href="https://github.com/tuempresa" target="_blank" title="GitHub"><img src="assets/github.svg" alt="GitHub"></a>
+      <a href="https://www.ispc.edu.ar/" title="Pagina Principal"><img src="icons/ISPC-logo.png" alt="link"></a>
+      <a href="https://github.com/ISPC-PI-II-2024" target="_blank" title="Github"><img src="icons/github.png" alt="Github"></a>
+      <a href="https://www.linkedin.com/school/ispc-instituto-superior-polit-cnico-c-rdoba" target="_blank" title="LinkedIn"><img src="icons/linkedin.png" alt="LinkedIn"></a>
     </div>
   `;
 

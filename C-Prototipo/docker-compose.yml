@@ -1,0 +1,24 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "443:443"                    # Mapea el puerto HTTPS al host
+    volumes:
+      - ./certs:/etc/nginx/certs:ro  # Certificados para nginx (solo lectura)
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "4443:4443"                  # Mapea el puerto HTTPS del backend al host
+    volumes:
+      - ./certs:/app/certs:ro        # Certificados para backend
+    env_file:
+      - ./backend/.env               # Variables de entorno propias
+    restart: unless-stopped
+
+# NOTA:
+# - Est probablmente se acople al compose final cuando se encuentre desplegado el backend en su totalidad.
+
