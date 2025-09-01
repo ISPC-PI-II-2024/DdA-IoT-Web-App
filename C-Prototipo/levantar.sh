@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # ==========================
 # Script para levantar backend y frontend en local (modo dev)
 # Ejecuten este comando antes para ver si tiene habilitados los permisos de ejecución:

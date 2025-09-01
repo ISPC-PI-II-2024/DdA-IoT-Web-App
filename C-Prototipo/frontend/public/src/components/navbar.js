@@ -12,28 +12,55 @@ function navLink(hash, label) {
 }
 
 function buildLeft(role) {
-  const box = el("nav", {});
+  // Contenedor de navegación con clase esperada por el CSS
+  const nav = el("nav", { class: "navbar-nav" });
   // Público
-  box.appendChild(navLink("dashboard", "Dashboard"));
-  box.appendChild(navLink("sobre-nosotros", "Sobre Nosotros"));
+  nav.appendChild(navLink("dashboard", "Dashboard"));
+  nav.appendChild(navLink("sobre-nosotros", "Sobre Nosotros"));
 
   // Admin-only (ejemplo futuro: /admin-tools)
   if (role === ROLES_CONST.ADMIN) {
-    // box.appendChild(navLink("admin-tools", "Admin"));
+    // nav.appendChild(navLink("admin-tools", "Admin"));
   }
-  return box;
+  return nav;
 }
 
 function buildRight(user, role) {
-  const r = el("div", { class: "right" });
-  r.appendChild(el("span", { class: "badge" }, role));
+  // Contenedor usuario, clase esperada por el CSS
+  const userBox = el("div", { class: "navbar-user" });
+
   if (user) {
-    r.appendChild(el("span", { class: "muted" }, user.name || user.email));
-    r.appendChild(el("button", { class: "btn", onClick: () => { logout(); location.hash = "#/login"; } }, "Salir"));
+    userBox.appendChild(
+      el("span", { class: "usuario" }, user.name || user.email)
+    );
+    userBox.appendChild(
+      el(
+        "button",
+        {
+          class: "btn-logout",
+          onClick: () => {
+            logout();
+            location.hash = "#/login";
+          },
+        },
+        "Salir"
+      )
+    );
   } else {
-    r.appendChild(el("a", { href: "#/login" }, "Ingresar"));
+    userBox.appendChild(
+      el(
+        "button",
+        {
+          class: "btn-login",
+          onClick: () => {
+            location.hash = "#/login";
+          },
+        },
+        "Ingresar"
+      )
+    );
   }
-  return r;
+  return userBox;
 }
 
 export function renderNavbar() {
@@ -41,8 +68,10 @@ export function renderNavbar() {
 
   const draw = () => {
     const { user, role } = getState();
-    const bar = el("div", { class: "navbar" },
-      el("div", { class: "brand" }, "C-Prototipo"),
+    const bar = el(
+      "div",
+      { class: "navbar" },
+      el("div", { class: "navbar-logo" }, "ISPC Desarrollo Aplicaciones"),
       buildLeft(role),
       buildRight(user, role)
     );
