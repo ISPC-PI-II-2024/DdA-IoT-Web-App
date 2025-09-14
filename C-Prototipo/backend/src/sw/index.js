@@ -3,10 +3,11 @@
 // - Handshake por querystring ?token= (simple para prototipo)
 // - Pub/Sub por tópico
 // - Keepalive con ping/pong
-// - Demo feed: publica "metrics/demo" cada 1s
+// - Integración con MQTT para datos de temperatura en tiempo real
 // ==========================
 import { WebSocketServer } from "ws";
 import { verifyAccessToken } from "../service/jwt.service.js";
+import { mqttService } from "../service/mqtt.service.js";
 import { createServer } from "http";
 import url from "url";
 
@@ -77,8 +78,11 @@ export function initWebSocket(httpServer) {
     ws.isAlive = true;
     ws.on("pong", () => (ws.isAlive = true));
 
-    // Suscripción por defecto (opcional)
-    // sub(ws, "metrics/demo");
+    // Suscripción por defecto a datos de temperatura
+    sub(ws, "temperature");
+    
+    // Registrar en MQTT service para broadcasting
+    mqttService.addSubscriber(ws);
 
     ws.on("message", (raw) => {
       let msg = null;
@@ -104,6 +108,7 @@ export function initWebSocket(httpServer) {
 
     ws.on("close", () => {
       unsubAll(ws);
+      mqttService.removeSubscriber(ws);
     });
   });
 
@@ -118,8 +123,8 @@ export function initWebSocket(httpServer) {
 
   wss.on("close", () => clearInterval(interval));
 
-  // ======= publica un valor seno cada 1s en "metrics/demo" =======
-  // De momento no reacciona, queda seguir probando
+  // ======= Demo feed: publica un valor seno cada 1s en "metrics/demo" =======
+  // Mantenido para compatibilidad, pero ahora también tenemos datos reales de MQTT
   
   let t = 0;
   setInterval(() => {

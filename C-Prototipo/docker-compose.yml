@@ -1,24 +1,242 @@
-services:
-  frontend:
-    build:
-      context: ./frontend
-    ports:
-      - "443:443"                    # Mapea el puerto HTTPS al host
-    volumes:
-      - ./certs:/etc/nginx/certs:ro  # Certificados para nginx (solo lectura)
-    restart: unless-stopped
+version: '3.8'
 
+services:
+  # =========================
+  # Base de Datos MariaDB
+  # =========================
+  mariadb:
+    image: mariadb:10.11
+    container_name: TST-DA-mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword123}
+      MYSQL_DATABASE: TST-DA
+      MYSQL_USER: ${DB_USER:-tst_da_user}
+      MYSQL_PASSWORD: ${DB_PASS:-tst_da_password_2024}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./docker/mariadb/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3306:3306"
+    networks:
+      - TST-DA-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # =========================
+  # InfluxDB (Time Series Database)
+  # =========================
+  influxdb:
+    image: influxdb:2.7
+    container_name: TST-DA-influxdb
+    restart: unless-stopped
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_USER:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_PASSWORD:-adminpassword123}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG:-iot-org}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET:-iot-data}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN:-iot-token-12345678901234567890123456789012}
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    ports:
+      - "8086:8086"
+    networks:
+      - TST-DA-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # =========================
+  # Telegraf (Data Collection Agent)
+  # =========================
+  telegraf:
+    image: telegraf:1.28
+    container_name: TST-DA-telegraf
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+      - mosquitto
+    environment:
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-iot-token-12345678901234567890123456789012}
+    volumes:
+      - ./docker/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - TST-DA-network
+    links:
+      - influxdb
+      - mosquitto
+
+  # =========================
+  # Mosquitto MQTT Broker
+  # =========================
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: TST-DA-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"  # MQTT
+      - "9001:9001"  # WebSocket
+    volumes:
+      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./docker/mosquitto/passwd:/mosquitto/config/passwd:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    networks:
+      - TST-DA-network
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "test", "-m", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =========================
+  # Backend Node.js
+  # =========================
   backend:
     build:
       context: ./backend
-    ports:
-      - "4443:4443"                  # Mapea el puerto HTTPS del backend al host
-    volumes:
-      - ./certs:/app/certs:ro        # Certificados para backend
-    env_file:
-      - ./backend/.env               # Variables de entorno propias
+      dockerfile: ../docker/backend.Dockerfile
+    container_name: TST-DA-backend
     restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: mariadb
+      DB_USER: ${DB_USER:-tst_da_user}
+      DB_PASS: ${DB_PASS:-tst_da_password_2024}
+      DB_NAME: TST-DA
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 1883
+      MQTT_BROKER_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_BROKER_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_TOPICS: ${MQTT_TOPICS:-vittoriodurigutti/prueba,vittoriodurigutti/temperature,vittoriodurigutti/sensor/+}
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-iot-token-12345678901234567890123456789012}
+      INFLUX_ORG: ${INFLUX_ORG:-iot-org}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-iot-data}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    networks:
+      - TST-DA-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
-# NOTA:
-# - Est probablmente se acople al compose final cuando se encuentre desplegado el backend en su totalidad.
+  # =========================
+  # Frontend Nginx
+  # =========================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
+    container_name: TST-DA-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/public:/usr/share/nginx/html:ro
+      - ./certs:/etc/nginx/certs:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - TST-DA-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+  # =========================
+  # Nginx Proxy Manager
+  # =========================
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: TST-DA-proxy-manager
+    restart: unless-stopped
+    ports:
+      - "80:80"      # HTTP
+      - "81:81"      # Admin UI
+      - "443:443"    # HTTPS
+    volumes:
+      - npm_data:/data
+      - npm_letsencrypt:/etc/letsencrypt
+    networks:
+      - TST-DA-network
+      environment:
+        DB_MYSQL_HOST: mariadb
+        DB_MYSQL_PORT: 3306
+        DB_MYSQL_USER: ${DB_USER:-tst_da_user}
+        DB_MYSQL_PASSWORD: ${DB_PASS:-tst_da_password_2024}
+        DB_MYSQL_NAME: npm_db
+
+  # =========================
+  # Redis (para cache y sesiones)
+  # =========================
+  redis:
+    image: redis:7-alpine
+    container_name: TST-DA-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redispassword123}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - TST-DA-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+# =========================
+# Volúmenes persistentes
+# =========================
+volumes:
+  mariadb_data:
+    driver: local
+  influxdb_data:
+    driver: local
+  influxdb_config:
+    driver: local
+  mosquitto_data:
+    driver: local
+  mosquitto_logs:
+    driver: local
+  npm_data:
+    driver: local
+  npm_letsencrypt:
+    driver: local
+  redis_data:
+    driver: local
+
+# =========================
+# Red personalizada
+# =========================
+networks:
+  TST-DA-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

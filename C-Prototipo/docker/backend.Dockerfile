@@ -1,23 +1,44 @@
-# Usa una imagen oficial de Node.js (alpine = ligera)
+# =========================
+# Backend Dockerfile
+# =========================
 FROM node:20-alpine
 
-# Crea y setea el directorio de trabajo
+# Instalar dependencias del sistema
+RUN apk add --no-cache \
+    curl \
+    mariadb-client \
+    && rm -rf /var/cache/apk/*
+
+# Crear usuario no-root para seguridad
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Crear y setear directorio de trabajo
 WORKDIR /app
 
-# Copia solo los archivos de dependencias primero, para cachear mejor las builds
+# Copiar archivos de dependencias
 COPY package*.json ./
-RUN npm install --omit=dev
 
-# Copia el resto del código fuente
+# Instalar dependencias
+RUN npm ci --only=production && npm cache clean --force
+
+# Copiar código fuente
 COPY . .
 
-# Define el entorno de producción
+# Cambiar ownership al usuario nodejs
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+# Variables de entorno
 ENV NODE_ENV=production
+ENV PORT=4000
 
-# Expone el puerto seguro por defecto (ajusta si tu app escucha en otro)
-EXPOSE 4443
+# Exponer puerto
+EXPOSE 4000
 
-# Comando de inicio (ajusta si usas otro script)
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Comando de inicio
 CMD ["npm", "start"]
-
-# NOTA: Si tu backend aún no soporta HTTPS directo, avísame para adaptarlo.

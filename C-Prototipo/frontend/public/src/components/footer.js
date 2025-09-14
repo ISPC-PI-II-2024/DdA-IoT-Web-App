@@ -17,7 +17,7 @@ export function renderFooter() {
   // Derechos y aclaraciones
   const copyright = `
     <div class="footer-copy">
-      &copy; ${new Date().getFullYear()} MiEmpresa. Todos los derechos reservados.<br>
+      &copy; ${new Date().getFullYear()} ISPC Tecnicatura Superior en Telecomunicaciones - Cohorte 2024. Todos los derechos reservados.<br>
       <span class="footer-legal">* Para uso interno. No compartir credenciales.</span>
     </div>
   `;

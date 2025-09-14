@@ -1,13 +1,33 @@
-# Usa la imagen oficial de Nginx
+# =========================
+# Frontend Dockerfile
+# =========================
 FROM nginx:alpine
 
-# Copia la configuración personalizada de Nginx (para HTTPS y rutas)
+# Instalar curl para health checks
+RUN apk add --no-cache curl
+
+# Copiar configuración personalizada de Nginx
 COPY ./nginx.conf /etc/nginx/nginx.conf
 
-# Copia todos los archivos estáticos del frontend
+# Crear directorio para certificados
+RUN mkdir -p /etc/nginx/certs
+
+# Copiar archivos estáticos del frontend
 COPY . /usr/share/nginx/html
 
-# Expone el puerto HTTPS por defecto
-EXPOSE 443
+# Crear archivo de health check
+RUN echo '<!DOCTYPE html><html><body><h1>Frontend OK</h1></body></html>' > /usr/share/nginx/html/health
 
-# NOTA: A futuro, puedes redirigir HTTP a HTTPS si lo deseas.
+# Configurar permisos
+RUN chown -R nginx:nginx /usr/share/nginx/html && \
+    chmod -R 755 /usr/share/nginx/html
+
+# Exponer puertos
+EXPOSE 80 443
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
+
+# Comando de inicio
+CMD ["nginx", "-g", "daemon off;"]
