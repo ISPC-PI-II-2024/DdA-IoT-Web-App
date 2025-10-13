@@ -2,7 +2,7 @@
 // Wrapper de fetch + helpers de Auth
 // ==========================
 import { storage } from "./utils/storage.js";
-import { setState } from "./state/store.js";
+import { setState, ROLES_CONST } from "./state/store.js";
 
 const CFG = () => window.__CONFIG || {};
 const TOKEN_KEY = "auth_token";
@@ -22,7 +22,34 @@ export function clearSession() {
   storage.del(TOKEN_KEY, true);
   storage.del(USER_KEY, true);
   storage.del(ROLE_KEY, true);
-  setState({ user: null, role: "guest" });
+  // También limpiar localStorage por seguridad
+  storage.del(TOKEN_KEY, false);
+  storage.del(USER_KEY, false);
+  storage.del(ROLE_KEY, false);
+  setState({ user: null, role: ROLES_CONST.GUEST, currentProject: null });
+}
+
+// Inicializar sesión desde storage al cargar la app
+export async function initSession() {
+  const token = getToken();
+  const storedUser = storage.get(USER_KEY, null, true);
+  const storedRole = storage.get(ROLE_KEY, null, true);
+  
+  if (token && storedUser && storedRole) {
+    try {
+      // Verificar que el token sigue siendo válido consultando algún endpoint
+      // Por simplicidad, intentamos hacer una request autenticada
+      await request("/config/general", { auth: true });
+      // Si no lanza error, el token es válido, restaurar sesión
+      setSession({ accessToken: token, user: storedUser, role: storedRole });
+      return true;
+    } catch (error) {
+      // Token inválido, limpiar sesión
+      clearSession();
+      return false;
+    }
+  }
+  return false;
 }
 
 async function request(path, { method = "GET", body, auth = false } = {}) {
@@ -46,5 +73,34 @@ async function request(path, { method = "GET", body, auth = false } = {}) {
 export const AuthAPI = {
   googleLogin(credential) {
     return request("/auth/google", { method: "POST", body: { credential } });
+  }
+};
+
+export const ConfigAPI = {
+  // Configuración general - todos los autenticados
+  getGeneralConfig() {
+    return request("/config/general", { auth: true });
+  },
+  
+  // Configuración avanzada - solo admin
+  getAdvancedConfig() {
+    return request("/config/advanced", { auth: true });
+  },
+  
+  updateAdvancedConfig(config) {
+    return request("/config/advanced", { method: "PUT", body: { config }, auth: true });
+  },
+  
+  // Administración
+  getMQTTStatus() {
+    return request("/config/mqtt/status", { auth: true });
+  },
+  
+  restartMQTTConnection() {
+    return request("/config/mqtt/restart", { method: "POST", auth: true });
+  },
+  
+  clearDataCache() {
+    return request("/config/cache/clear", { method: "POST", auth: true });
   }
 };

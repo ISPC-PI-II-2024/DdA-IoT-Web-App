@@ -12,6 +12,7 @@ import { security } from "./config/security.js";
 import { createServer } from "http";
 import authRoutes from "./routes/auth.routes.js";
 import configRoutes from "./routes/config.routes.js";
+import configSystemRoutes from "./routes/config.system.routes.js";
 import dataRoutes from './routes/data.routes.js';
 import temperatureRoutes from "./routes/temperature.routes.js";
 import { initWebSocket } from "./sw/index.js";
@@ -35,6 +36,7 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 // API
 app.use("/api/auth", authRoutes);
 app.use("/api", configRoutes);
+app.use("/api/config", configSystemRoutes);
 app.use("/api", temperatureRoutes);
 app.use('/api', dataRoutes);
 

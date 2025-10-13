@@ -1,0 +1,12 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+/backend/node_modules/
+/frontend/node_modules/
+/docker/frontend.Dockerfile
+/docker/backend.Dockerfile
+/docker/mariadb.Dockerfile
+/docker/influxdb.Dockerfile
+/docker/mosquitto.Dockerfile
+/docker/redis.Dockerfile
+/docker/telegraf.Dockerfile
+/docker/nginx-proxy-manager.Dockerfile
+/docker/env.example

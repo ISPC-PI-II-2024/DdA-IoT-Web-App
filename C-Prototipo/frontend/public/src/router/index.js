@@ -11,6 +11,8 @@ const routes = {
   "login":     { view: () => import("../pages/login.js").then(m => m.render),        meta: { public: true } },
   "dashboard": { view: () => import("../pages/dashboard.js").then(m => m.render),    meta: { roles: [ROLES_CONST.ADMIN, ROLES_CONST.ACTION, ROLES_CONST.READONLY] } },
   "sobre-nosotros": { view: () => import("../pages/sobreNosotros.js").then(m => m.render), meta: { public: true } },
+  "configuracion": { view: () => import("../pages/configuracion.js").then(m => m.render), meta: { roles: [ROLES_CONST.ADMIN, ROLES_CONST.ACTION, ROLES_CONST.READONLY] } },
+  "configuracion/avanzada": { view: () => import("../pages/configuracionAvanzada.js").then(m => m.render), meta: { roles: [ROLES_CONST.ADMIN] } },
   "404":       { view: () => import("../pages/notFound.js").then(m => m.render),     meta: { public: true } }
 };
 
