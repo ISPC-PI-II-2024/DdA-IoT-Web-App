@@ -6,6 +6,7 @@
 
 import { el } from "../utils/dom.js";
 import { getState, subscribe, logout, ROLES_CONST } from "../state/store.js";
+import { clearSession } from "../api.js";
 
 function navLink(hash, label) {
   return el("a", { href: `#/${hash}`, "data-nav": hash }, label);
@@ -18,7 +19,12 @@ function buildLeft(role) {
   nav.appendChild(navLink("dashboard", "Dashboard"));
   nav.appendChild(navLink("sobre-nosotros", "Sobre Nosotros"));
 
-  // Admin-only (ejemplo futuro: /admin-tools)
+  // Configuracion - disponible para todos los roles autenticados
+  if (role !== ROLES_CONST.GUEST) {
+    nav.appendChild(navLink("configuracion", "Configuración"));
+  }
+
+  // Admin-only - Configuración avanzada aparecerá dentro de la página de configuración
   if (role === ROLES_CONST.ADMIN) {
     // nav.appendChild(navLink("admin-tools", "Admin"));
   }
@@ -39,6 +45,7 @@ function buildRight(user, role) {
         {
           class: "btn-logout",
           onClick: () => {
+            clearSession();
             logout();
             location.hash = "#/login";
           },

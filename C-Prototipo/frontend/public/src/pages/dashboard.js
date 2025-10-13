@@ -1,6 +1,7 @@
 import { el } from "../utils/dom.js";
 import { getState } from "../state/store.js";
 import { chartWidget } from "../components/chartWidget.js";
+import { temperatureChartWidget } from "../components/temperatureChart.js";
 import { rtClient } from "../ws.js";
 
 export async function render() {
@@ -16,6 +17,14 @@ export async function render() {
     el("p", { class: "muted" }, `Proyecto actual: ${currentProject ?? "—"}`)
   );
 
+  // Gráfico de temperatura MQTT
+  const temperatureChart = await temperatureChartWidget({ 
+    title: "Temperatura MQTT - vittoriodurigutti/prueba",
+    maxPoints: 60,
+    showStats: true
+  });
+
+  // Gráfico demo original (mantenido para compatibilidad)
   const rtChart = await chartWidget({ title: "Métrica RT (metrics/demo)", topic: "metrics/demo" });
 
   const grids = el("div", { class: "grid cols-2" },
@@ -40,5 +49,5 @@ export async function render() {
     )
   );
 
-  return el("div", {}, header, grids, actions);
+  return el("div", {}, header, temperatureChart, grids, actions);
 }

@@ -2,6 +2,8 @@
 # Script para levantar backend y frontend en local (modo dev)
 # Ejecuten este comando antes para ver si tiene habilitados los permisos de ejecución:
 #   chmod +x levantar.sh
+# Si ya los tenes, levanta en consola con:
+#   ./levantar.sh
 # ==========================
 
 set -e
@@ -22,25 +24,22 @@ echo "=========================="
 cd backend
 npm install
 cd ../frontend
-npm install || true # Por si el front tiene dev server (vite, react, etc)
 cd ..
 
 echo ""
 echo "=========================="
 echo " Levantando servidores "
 echo "=========================="
-# Backend
-(cd backend && npm run dev) &   # Ajustá a tu comando de desarrollo real, por ej npm start
+# Backend (puerto desde .env raíz; por defecto 4000)
+(cd backend && npm start) &
 
-# Frontend: 
-# Si tu frontend es solo archivos estáticos (ej: vanilla JS), podés levantar con live-server:
-# Si usás Vite/React/etc, reemplazá por npm run dev
-(cd frontend && npx live-server public) &
+# Frontend (archivos estáticos con live-server en 127.0.0.1:8080)
+(cd frontend && npx live-server public --host=127.0.0.1 --port=8080 --no-browser) &
 
 echo ""
 echo "====================================="
 echo " Ambos servidores corriendo en local "
-echo " Backend: http://localhost:3000"
+echo " Backend: http://127.0.0.1:${PORT:-4000}"
 echo " Frontend: http://127.0.0.1:8080 (por default live-server)"
 echo " Presioná Ctrl+C para frenar todo."
 echo "====================================="

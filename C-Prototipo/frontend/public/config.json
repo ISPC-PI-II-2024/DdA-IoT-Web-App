@@ -1,6 +1,7 @@
 {
-  "API_URL": "http://192.168.100.2:3000/api",
-  "WS_URL": "ws://192.168.100.2:3000/ws",
-  "GOOGLE_CLIENT_ID": "",
-  "ROLES": { "ADMIN": "admin", "ACTION": "action", "READONLY": "readonly", "GUEST": "guest" }
+  "API_URL": "http://127.0.0.1:4000/api",
+  "WS_URL": "ws://127.0.0.1:4000/ws"
 }
+
+
+

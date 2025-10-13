@@ -17,17 +17,7 @@
        Para dev local, hardcodeamos valores de prueba.
        En prod, este bloque se puede reemplazar por fetch(/config.json)
        ========================== -->
-  <script>
-    window.__CONFIG = {
-      API_URL: "http://localhost:3000/api",
-      WS_URL: "ws://localhost:3000/ws",
-      GOOGLE_CLIENT_ID: "113014965393-9t3h4eg2jr4aj7mfs4q78kkajln16m79.apps.googleusercontent.com",
-      ROLES: { ADMIN: "admin", ACTION: "action", READONLY: "readonly", GUEST: "guest" }
-    };
-  </script>
-
-  <!-- (Paso 2) GIS: <script src="https://accounts.google.com/gsi/client" async defer></script> -->
-  <script type="module" src="/src/app.js"></script>
+  <script type="module" src="/src/loader.js"></script>
 </head>
 <body>
   <!-- ==========================

@@ -5,7 +5,7 @@
 // - Dev fallback: login simulado por rol (opcional)
 // ==========================
 import { el } from "../utils/dom.js";
-import { setState, ROLES_CONST } from "../state/store.js";
+import { setState } from "../state/store.js";
 import { AuthAPI, setSession } from "../api.js";
 
 function loadGIS() {
@@ -23,7 +23,7 @@ function loadGIS() {
 async function initGoogle(container) {
   const { GOOGLE_CLIENT_ID } = window.__CONFIG || {};
   if (!GOOGLE_CLIENT_ID) {
-    container.appendChild(el("p", { class: "muted" }, "Falta GOOGLE_CLIENT_ID en config. Usa el login simulado."));
+    container.appendChild(el("p", { class: "error" }, "Falta GOOGLE_CLIENT_ID en la configuración. Verificá que /api/config lo devuelva y que el .env raíz tenga el valor correcto."));
     return;
   }
   await loadGIS();
@@ -58,35 +58,6 @@ async function initGoogle(container) {
   });
 }
 
-function renderDevFallback(container) {
-  // ===== Fallback para DEV: login simulado por rol =====
-  const roles = [ROLES_CONST.ADMIN, ROLES_CONST.ACTION, ROLES_CONST.READONLY];
-  const box = el("div", { class: "card" },
-    el("h3", {}, "Login simulado (DEV)"),
-    el("div", {},
-      el("label", {}, "Rol: "),
-      (() => {
-        const sel = el("select", {});
-        roles.forEach(r => sel.appendChild(el("option", { value: r }, r)));
-        return sel;
-      })(),
-      el("div", { style: "margin-top:.5rem" },
-        el("button", {
-          class: "btn",
-          onClick: (e) => {
-            const role = e.target.parentElement.previousSibling.value;
-            const user = { email: "demo@local", name: "Demo" };
-            // No hay token real en fallback; sólo ajustar estado
-            setState({ user, role });
-            location.hash = "#/dashboard";
-          }
-        }, "Entrar (DEV)")
-      )
-    )
-  );
-  container.appendChild(box);
-}
-
 export async function render() {
   const root = el("div", { class: "container" },
     el("div", { class: "card" },
@@ -97,9 +68,6 @@ export async function render() {
 
   // Contenedor para GIS
   await initGoogle(root);
-
-  // Fallback DEV
-  renderDevFallback(root);
 
   return root;
 }

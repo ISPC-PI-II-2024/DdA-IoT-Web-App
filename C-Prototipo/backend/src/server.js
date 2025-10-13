@@ -11,8 +11,12 @@ import { ENV } from "./config/env.js";
 import { security } from "./config/security.js";
 import { createServer } from "http";
 import authRoutes from "./routes/auth.routes.js";
+import configRoutes from "./routes/config.routes.js";
+import configSystemRoutes from "./routes/config.system.routes.js";
 import dataRoutes from './routes/data.routes.js';
+import temperatureRoutes from "./routes/temperature.routes.js";
 import { initWebSocket } from "./sw/index.js";
+import { mqttService } from "./service/mqtt.service.js";
 
 const app = express();
 
@@ -31,13 +35,21 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 
 // API
 app.use("/api/auth", authRoutes);
+app.use("/api", configRoutes);
+app.use("/api/config", configSystemRoutes);
+app.use("/api", temperatureRoutes);
 app.use('/api', dataRoutes);
 
 // HTTP server + WS
 const server = createServer(app);
 initWebSocket(server);
 
+// Iniciar conexión MQTT
+mqttService.connect();
+
 // Arranque
 server.listen(ENV.PORT, () => {
   console.log(`HTTP+WS listening on http://localhost:${ENV.PORT}  (ws path: /ws)`);
+  console.log(`📡 MQTT broker: ${ENV.MQTT_BROKER_HOST}:${ENV.MQTT_BROKER_PORT}`);
+  console.log(`📡 MQTT topics: ${ENV.MQTT_TOPICS.join(", ")}`);
 });
