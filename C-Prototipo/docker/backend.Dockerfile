@@ -1,44 +1,48 @@
-# =========================
-# Backend Dockerfile
-# =========================
+# ==========================
+# Dockerfile para Backend Node.js
+# Aplicación IoT con Express + WebSocket + MQTT
+# ==========================
+
+# Usar imagen oficial de Node.js LTS Alpine para menor tamaño
 FROM node:20-alpine
 
-# Instalar dependencias del sistema
-RUN apk add --no-cache \
-    curl \
-    mariadb-client \
-    && rm -rf /var/cache/apk/*
+# Metadatos del contenedor
+LABEL maintainer="ISPC 2025 - Desarrollo de Aplicaciones IoT"
+LABEL description="Backend para aplicación IoT con Express, WebSocket y MQTT"
+LABEL version="1.0.0"
 
 # Crear usuario no-root para seguridad
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Crear y setear directorio de trabajo
+# Establecer directorio de trabajo
 WORKDIR /app
 
-# Copiar archivos de dependencias
-COPY package*.json ./
+# Copiar archivos de dependencias primero (para aprovechar cache de Docker)
+COPY backend/package*.json ./
 
-# Instalar dependencias
+# Instalar dependencias de producción
 RUN npm ci --only=production && npm cache clean --force
 
-# Copiar código fuente
-COPY . .
+# Copiar código fuente del backend
+COPY backend/src ./src
 
-# Cambiar ownership al usuario nodejs
+# Cambiar propietario de archivos al usuario nodejs
 RUN chown -R nodejs:nodejs /app
+
+# Cambiar a usuario no-root
 USER nodejs
 
-# Variables de entorno
+# Exponer puerto (por defecto 3000, configurable via ENV)
+EXPOSE 3000
+
+# Variables de entorno por defecto
 ENV NODE_ENV=production
-ENV PORT=4000
+ENV PORT=3000
 
-# Exponer puerto
-EXPOSE 4000
+# Health check para verificar que el servicio esté funcionando
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
-
-# Comando de inicio
-CMD ["npm", "start"]
+# Comando para iniciar la aplicación
+CMD ["node", "src/server.js"]
