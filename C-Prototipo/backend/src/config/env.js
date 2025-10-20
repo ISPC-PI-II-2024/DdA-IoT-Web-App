@@ -15,6 +15,11 @@ const schema = Joi.object({
   NODE_ENV: Joi.string().valid("development", "production", "test").default("development"),
   PORT: Joi.number().integer().default(3000),
 
+  // Modo de desarrollo
+  DEV_MODE: Joi.string().valid("true", "false").default("false"),
+  DEV_USER_EMAIL: Joi.string().email().default("dev@localhost.com"),
+  DEV_USER_NAME: Joi.string().default("Desarrollador Local"),
+
   // Seguridad JWT propia
   JWT_SECRET: Joi.string().min(24).required(),
   JWT_EXPIRES_IN: Joi.string().default("15m"),
@@ -54,6 +59,9 @@ function parseList(s) {
 export const ENV = {
   NODE_ENV: value.NODE_ENV,
   PORT: value.PORT,
+  DEV_MODE: value.DEV_MODE,
+  DEV_USER_EMAIL: value.DEV_USER_EMAIL,
+  DEV_USER_NAME: value.DEV_USER_NAME,
   JWT_SECRET: value.JWT_SECRET,
   JWT_EXPIRES_IN: value.JWT_EXPIRES_IN,
   REFRESH_EXPIRES_IN: value.REFRESH_EXPIRES_IN,

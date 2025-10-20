@@ -1,11 +1,15 @@
 import { el } from "../utils/dom.js";
-import { getState } from "../state/store.js";
+import { getState, subscribe } from "../state/store.js";
 import { chartWidget } from "../components/chartWidget.js";
 import { temperatureChartWidget } from "../components/temperatureChart.js";
+import { deviceSelectorWidget, selectedDeviceInfoWidget } from "../components/deviceSelector.js";
+import { generalStatusWidget } from "../components/generalStatusWidget.js";
+import { deviceVisualizationWidget } from "../components/deviceVisualization.js";
+import { DevicesAPI } from "../api.js";
 import { rtClient } from "../ws.js";
 
 export async function render() {
-  const { role, currentProject } = getState();
+  const { role, currentProject, selectedDevice } = getState();
 
   // Asegurar conexión WS (si aún no conectó)
   if (!rtClient.ws) {
@@ -17,37 +21,214 @@ export async function render() {
     el("p", { class: "muted" }, `Proyecto actual: ${currentProject ?? "—"}`)
   );
 
-  // Gráfico de temperatura MQTT
-  const temperatureChart = await temperatureChartWidget({ 
-    title: "Temperatura MQTT - vittoriodurigutti/prueba",
-    maxPoints: 60,
-    showStats: true
+  // Widget de estado general con indicadores LED
+  const generalStatus = await generalStatusWidget();
+
+  // Selector de dispositivos
+  const deviceSelector = await deviceSelectorWidget();
+  
+  // Información del dispositivo seleccionado (solo se muestra si hay un dispositivo seleccionado)
+  const deviceInfo = selectedDevice ? selectedDeviceInfoWidget() : null;
+
+  // Visualización SVG del dispositivo (solo se muestra si hay un dispositivo seleccionado)
+  const deviceVisualization = selectedDevice ? await deviceVisualizationWidget(selectedDevice) : null;
+
+  // Contenedor para datos específicos del dispositivo
+  const deviceDataContainer = el("div", {
+    id: "device-data-container",
+    style: "margin-top: 20px;"
   });
 
-  // Gráfico demo original (mantenido para compatibilidad)
-  const rtChart = await chartWidget({ title: "Métrica RT (metrics/demo)", topic: "metrics/demo" });
+  // Función para cargar datos del dispositivo seleccionado
+  async function loadDeviceData(device) {
+    try {
+      // Limpiar contenedor anterior
+      deviceDataContainer.innerHTML = "";
+      
+      // Mostrar indicador de carga
+      deviceDataContainer.appendChild(el("div", {
+        style: "text-align: center; padding: 20px; color: #666;"
+      }, "Cargando datos del dispositivo..."));
 
-  const grids = el("div", { class: "grid cols-2" },
-    el("div", { class: "card" },
-      el("h3", {}, "Estado general"),
-      el("ul", {},
-        el("li", {}, "Dispositivos online: 0"),
-        el("li", {}, "Alertas activas: 0"),
-        el("li", {}, "Última ingesta: —")
+      // Obtener datos del dispositivo
+      const [deviceDetails, sensorData] = await Promise.all([
+        DevicesAPI.getDeviceById(device.id_dispositivo),
+        DevicesAPI.getDeviceSensorData(device.id_dispositivo, 50)
+      ]);
+
+      if (deviceDetails.success && sensorData.success) {
+        // Crear widgets de datos específicos del dispositivo
+        const deviceStats = el("div", { class: "card" },
+          el("h3", {}, "Estadísticas del Dispositivo"),
+          el("div", { class: "grid cols-2" },
+            el("div", {},
+              el("h4", {}, "Datos de Sensores"),
+              el("ul", { style: "list-style: none; padding: 0;" },
+                el("li", { style: "margin-bottom: 8px;" }, 
+                  el("strong", {}, "Total de datos: "), deviceDetails.data.stats.total_datos || 0
+                ),
+                el("li", { style: "margin-bottom: 8px;" }, 
+                  el("strong", {}, "Tipos de sensores: "), deviceDetails.data.stats.tipos_sensor || 0
+                ),
+                el("li", { style: "margin-bottom: 8px;" }, 
+                  el("strong", {}, "Promedio de valores: "), 
+                  deviceDetails.data.stats.promedio_valor ? 
+                    parseFloat(deviceDetails.data.stats.promedio_valor).toFixed(2) : 'N/A'
+                )
+              )
+            ),
+            el("div", {},
+              el("h4", {}, "Período de Datos"),
+              el("ul", { style: "list-style: none; padding: 0;" },
+                el("li", { style: "margin-bottom: 8px;" }, 
+                  el("strong", {}, "Primer dato: "), 
+                  deviceDetails.data.stats.primer_dato ? 
+                    new Date(deviceDetails.data.stats.primer_dato).toLocaleString() : 'N/A'
+                ),
+                el("li", { style: "margin-bottom: 8px;" }, 
+                  el("strong", {}, "Último dato: "), 
+                  deviceDetails.data.stats.ultimo_dato ? 
+                    new Date(deviceDetails.data.stats.ultimo_dato).toLocaleString() : 'N/A'
+                )
+              )
+            )
+          )
+        );
+
+        // Crear tabla de datos de sensores recientes
+        const sensorDataTable = el("div", { class: "card" },
+          el("h3", {}, "Datos de Sensores Recientes"),
+          sensorData.data.length > 0 ? 
+            el("div", { style: "overflow-x: auto;" },
+              el("table", { style: "width: 100%; border-collapse: collapse;" },
+                el("thead", {},
+                  el("tr", { style: "background-color: #f5f5f5;" },
+                    el("th", { style: "padding: 10px; text-align: left; border: 1px solid #ddd;" }, "Tipo de Sensor"),
+                    el("th", { style: "padding: 10px; text-align: left; border: 1px solid #ddd;" }, "Valor"),
+                    el("th", { style: "padding: 10px; text-align: left; border: 1px solid #ddd;" }, "Unidad"),
+                    el("th", { style: "padding: 10px; text-align: left; border: 1px solid #ddd;" }, "Timestamp")
+                  )
+                ),
+                el("tbody", {},
+                  ...sensorData.data.slice(0, 10).map(data => 
+                    el("tr", {},
+                      el("td", { style: "padding: 8px; border: 1px solid #ddd;" }, data.tipo_sensor),
+                      el("td", { style: "padding: 8px; border: 1px solid #ddd;" }, data.valor),
+                      el("td", { style: "padding: 8px; border: 1px solid #ddd;" }, data.unidad || 'N/A'),
+                      el("td", { style: "padding: 8px; border: 1px solid #ddd;" }, 
+                        new Date(data.timestamp).toLocaleString()
+                      )
+                    )
+                  )
+                )
+              )
+            ) :
+            el("p", { style: "text-align: center; color: #666; padding: 20px;" }, 
+              "No hay datos de sensores disponibles para este dispositivo"
+            )
+        );
+
+        // Limpiar y agregar nuevos elementos
+        deviceDataContainer.innerHTML = "";
+        deviceDataContainer.appendChild(deviceStats);
+        deviceDataContainer.appendChild(sensorDataTable);
+      }
+    } catch (error) {
+      console.error('Error cargando datos del dispositivo:', error);
+      deviceDataContainer.innerHTML = "";
+      deviceDataContainer.appendChild(el("div", {
+        class: "card",
+        style: "text-align: center; color: #d32f2f; padding: 20px;"
+      }, "Error cargando datos del dispositivo: " + error.message));
+    }
+  }
+
+  // Event listener para cuando se selecciona un dispositivo
+  deviceSelector.addEventListener('deviceSelected', (e) => {
+    loadDeviceData(e.detail.device);
+  });
+
+  // Si ya hay un dispositivo seleccionado, cargar sus datos
+  if (selectedDevice) {
+    loadDeviceData(selectedDevice);
+  }
+
+  // Cards que solo se muestran cuando hay un dispositivo seleccionado
+  let deviceSpecificCards = null;
+  
+  if (selectedDevice) {
+    // Gráfico de temperatura MQTT (mantenido para compatibilidad)
+    const temperatureChart = await temperatureChartWidget({ 
+      title: `Temperatura MQTT - ${selectedDevice.nombre}`,
+      maxPoints: 60,
+      showStats: true
+    });
+
+    // Gráfico demo original (mantenido para compatibilidad)
+    const rtChart = await chartWidget({ 
+      title: `Métrica RT - ${selectedDevice.nombre}`, 
+      topic: "metrics/demo" 
+    });
+
+    const grids = el("div", { class: "grid cols-2" },
+      el("div", { class: "card" },
+        el("h3", {}, "Estado del Dispositivo"),
+        el("ul", {},
+          el("li", {}, `Dispositivo: ${selectedDevice.nombre}`),
+          el("li", {}, `Estado: ${selectedDevice.estado}`),
+          el("li", {}, `Última conexión: ${selectedDevice.ultima_conexion ? new Date(selectedDevice.ultima_conexion).toLocaleString() : 'N/A'}`)
+        )
+      ),
+      rtChart
+    );
+
+    const actions = el("div", { class: "card" },
+      el("h3", {}, "Acciones del Dispositivo"),
+      el("p", { class: "muted" }, `Acciones específicas para ${selectedDevice.nombre} (solo admin/action).`),
+      el("div", {},
+        role === "readonly"
+          ? el("div", { class: "muted" }, "Solo lectura: no hay acciones disponibles.")
+          : el("div", { style: "display: flex; gap: 10px;" },
+              el("button", { class: "btn" }, "Reiniciar Dispositivo"),
+              el("button", { class: "btn" }, "Configurar Sensores"),
+              el("button", { class: "btn" }, "Exportar Datos")
+            )
       )
-    ),
-    rtChart
-  );
+    );
 
-  const actions = el("div", { class: "card" },
-    el("h3", {}, "Acciones"),
-    el("p", { class: "muted" }, "Acciones sobre dispositivos (solo admin/action)."),
-    el("div", {},
-      role === "readonly"
-        ? el("div", { class: "muted" }, "Solo lectura: no hay acciones disponibles.")
-        : el("button", { class: "btn" }, "Ejecutar acción (stub)")
-    )
-  );
+    deviceSpecificCards = el("div", {},
+      temperatureChart,
+      grids,
+      actions
+    );
+  } else {
+    // Mensaje cuando no hay dispositivo seleccionado
+    deviceSpecificCards = el("div", { class: "card" },
+      el("div", {
+        style: "text-align: center; padding: 40px; color: #666;"
+      },
+        el("h3", { style: "margin-bottom: 15px;" }, "Selecciona un Dispositivo"),
+        el("p", { style: "margin-bottom: 20px;" }, "Usa el selector de arriba para elegir un dispositivo y ver sus datos específicos."),
+        el("div", { style: "font-size: 0.9em; color: #888;" },
+          "Una vez seleccionado, podrás ver:",
+          el("ul", { style: "text-align: left; margin-top: 10px;" },
+            el("li", {}, "Estadísticas detalladas del dispositivo"),
+            el("li", {}, "Datos recientes de sensores"),
+            el("li", {}, "Gráficos específicos del dispositivo"),
+            el("li", {}, "Acciones disponibles para el dispositivo")
+          )
+        )
+      )
+    );
+  }
 
-  return el("div", {}, header, temperatureChart, grids, actions);
+  return el("div", {}, 
+    header, 
+    generalStatus,
+    deviceSelector, 
+    deviceInfo, 
+    deviceVisualization,
+    deviceDataContainer,
+    deviceSpecificCards
+  );
 }

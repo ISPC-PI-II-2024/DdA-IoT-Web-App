@@ -104,3 +104,20 @@ export const ConfigAPI = {
     return request("/config/cache/clear", { method: "POST", auth: true });
   }
 };
+
+export const DevicesAPI = {
+  // Obtener todos los dispositivos disponibles
+  getAllDevices() {
+    return request("/devices", { auth: true });
+  },
+  
+  // Obtener información detallada de un dispositivo específico
+  getDeviceById(deviceId) {
+    return request(`/devices/${deviceId}`, { auth: true });
+  },
+  
+  // Obtener datos de sensores de un dispositivo específico
+  getDeviceSensorData(deviceId, limit = 100) {
+    return request(`/devices/${deviceId}/sensor-data?limit=${limit}`, { auth: true });
+  }
+};

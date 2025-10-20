@@ -6,7 +6,7 @@
 
 import { el } from "../utils/dom.js";
 import { getState, subscribe, logout, ROLES_CONST } from "../state/store.js";
-import { clearSession } from "../api.js";
+import { clearSession, getToken } from "../api.js";
 
 function navLink(hash, label) {
   return el("a", { href: `#/${hash}`, "data-nav": hash }, label);
@@ -15,8 +15,15 @@ function navLink(hash, label) {
 function buildLeft(role) {
   // Contenedor de navegación con clase esperada por el CSS
   const nav = el("nav", { class: "navbar-nav" });
+  
   // Público
   nav.appendChild(navLink("dashboard", "Dashboard"));
+  
+  // Dispositivos - disponible para todos los roles autenticados
+  if (role !== ROLES_CONST.GUEST) {
+    nav.appendChild(navLink("dispositivos", "Dispositivos"));
+  }
+  
   nav.appendChild(navLink("sobre-nosotros", "Sobre Nosotros"));
 
   // Configuracion - disponible para todos los roles autenticados
@@ -29,6 +36,44 @@ function buildLeft(role) {
     // nav.appendChild(navLink("admin-tools", "Admin"));
   }
   return nav;
+}
+
+// Función para realizar logout completo de Google
+async function performGoogleLogout() {
+  try {
+    // Verificar si Google Identity Services está disponible
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      // Deshabilitar la selección automática
+      window.google.accounts.id.disableAutoSelect();
+      
+      // Cancelar cualquier sesión activa
+      window.google.accounts.id.cancel();
+      
+      // Limpiar cookies de Google si es posible
+      try {
+        // Intentar limpiar cookies relacionadas con Google
+        const cookies = document.cookie.split(';');
+        cookies.forEach(cookie => {
+          const eqPos = cookie.indexOf('=');
+          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+          if (name.includes('google') || name.includes('gid') || name.includes('gci')) {
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.google.com`;
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.accounts.google.com`;
+          }
+        });
+      } catch (cookieError) {
+        console.warn('No se pudieron limpiar las cookies de Google:', cookieError);
+      }
+      
+      console.log('Logout de Google completado');
+    } else {
+      console.log('Google Identity Services no está disponible');
+    }
+  } catch (error) {
+    console.warn('Error durante logout de Google:', error);
+    // Continuar con el logout local aunque falle el logout de Google
+  }
 }
 
 function buildRight(user, role) {
@@ -44,10 +89,36 @@ function buildRight(user, role) {
         "button",
         {
           class: "btn-logout",
-          onClick: () => {
-            clearSession();
-            logout();
-            location.hash = "#/login";
+          onClick: async (event) => {
+            try {
+              // Mostrar indicador de logout
+              const button = event.target;
+              const originalText = button.textContent;
+              button.textContent = "Cerrando sesión...";
+              button.disabled = true;
+              
+              // Realizar logout de Google
+              await performGoogleLogout();
+              
+              // Limpiar sesión local
+              clearSession();
+              logout();
+              
+              // Redirigir a login
+              location.hash = "#/login";
+              
+              // Recargar la página para limpiar completamente el estado
+              setTimeout(() => {
+                window.location.reload();
+              }, 100);
+              
+            } catch (error) {
+              console.error('Error durante logout:', error);
+              // Aún así, limpiar la sesión local y redirigir
+              clearSession();
+              logout();
+              location.hash = "#/login";
+            }
           },
         },
         "Salir"

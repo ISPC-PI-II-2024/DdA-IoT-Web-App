@@ -1,12 +1,12 @@
 -- =========================
--- Script de inicialización de MariaDB para TST-DA
+-- Script de inicialización de MariaDB para WebAPP-DB
 -- =========================
 
 -- Crear base de datos si no existe
-CREATE DATABASE IF NOT EXISTS `TST-DA` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS `WebAPP-DB` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Usar la base de datos
-USE `TST-DA`;
+USE `WebAPP-DB`;
 
 -- Tabla de usuarios (vinculados con Google)
 CREATE TABLE IF NOT EXISTS usuarios (
@@ -20,6 +20,18 @@ CREATE TABLE IF NOT EXISTS usuarios (
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     ultimo_acceso TIMESTAMP,
     metadatos JSON DEFAULT ('{}')
+);
+
+-- Tabla de usuarios de Google (simplificada para login)
+CREATE TABLE IF NOT EXISTS usuarios_google (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    mail VARCHAR(255) UNIQUE NOT NULL,
+    admin BOOLEAN DEFAULT FALSE,
+    action BOOLEAN DEFAULT FALSE,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    ultimo_login TIMESTAMP,
+    activo BOOLEAN DEFAULT TRUE
 );
 
 -- Tabla de roles
@@ -261,9 +273,9 @@ CREATE INDEX IF NOT EXISTS idx_usuarios_proyectos_proyecto_id ON usuarios_proyec
 CREATE DATABASE IF NOT EXISTS npm_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Crear usuario específico para la aplicación (si no existe)
-CREATE USER IF NOT EXISTS 'tst_da_user'@'%' IDENTIFIED BY 'tst_da_password_2024';
-GRANT ALL PRIVILEGES ON `TST-DA`.* TO 'tst_da_user'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON npm_db.* TO 'tst_da_user'@'%';
+CREATE USER IF NOT EXISTS 'webapp_user'@'%' IDENTIFIED BY 'webapp_password_2024';
+GRANT ALL PRIVILEGES ON `WebAPP-DB`.* TO 'webapp_user'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON npm_db.* TO 'webapp_user'@'%';
 FLUSH PRIVILEGES;
 
 -- Crear vistas útiles para reportes
@@ -300,27 +312,35 @@ GROUP BY d.id;
 
 -- Insertar datos de prueba (opcional - comentar en producción)
 INSERT IGNORE INTO usuarios (google_id, email, nombre, activo) VALUES
-('google_123456789', 'admin@tst-da.com', 'Administrador Sistema', true),
-('google_987654321', 'operador@tst-da.com', 'Operador Principal', true);
+('google_123456789', 'admin@webapp.com', 'Administrador Sistema', true),
+('google_987654321', 'operador@webapp.com', 'Operador Principal', true);
+
+-- Insertar usuarios de Google de prueba
+INSERT IGNORE INTO usuarios_google (mail, admin, action) VALUES
+('vittodutti@gmail.com', TRUE, TRUE),
+('admin@webapp.com', TRUE, FALSE),
+('operador@webapp.com', FALSE, TRUE),
+('usuario@webapp.com', FALSE, FALSE),
+('dev@localhost.com', TRUE, TRUE);
 
 -- Asignar roles a usuarios de prueba
 INSERT IGNORE INTO usuarios_roles (usuario_id, rol_id, asignado_por)
 SELECT u.id, r.id, u.id
 FROM usuarios u, roles r
-WHERE u.email = 'admin@tst-da.com' AND r.nombre = 'administrador';
+WHERE u.email = 'admin@webapp.com' AND r.nombre = 'administrador';
 
 INSERT IGNORE INTO usuarios_roles (usuario_id, rol_id, asignado_por)
 SELECT u.id, r.id, u.id
 FROM usuarios u, roles r
-WHERE u.email = 'operador@tst-da.com' AND r.nombre = 'operador';
+WHERE u.email = 'operador@webapp.com' AND r.nombre = 'operador';
 
 -- Asignar usuarios de prueba al proyecto principal
 INSERT IGNORE INTO usuarios_proyectos (usuario_id, proyecto_id, rol_proyecto)
 SELECT u.id, p.id, 'administrador'
 FROM usuarios u, proyectos p
-WHERE u.email = 'admin@tst-da.com' AND p.nombre = 'Proyecto Principal';
+WHERE u.email = 'admin@webapp.com' AND p.nombre = 'Proyecto Principal';
 
 INSERT IGNORE INTO usuarios_proyectos (usuario_id, proyecto_id, rol_proyecto)
 SELECT u.id, p.id, 'operador'
 FROM usuarios u, proyectos p
-WHERE u.email = 'operador@tst-da.com' AND p.nombre = 'Proyecto Principal';
+WHERE u.email = 'operador@webapp.com' AND p.nombre = 'Proyecto Principal';

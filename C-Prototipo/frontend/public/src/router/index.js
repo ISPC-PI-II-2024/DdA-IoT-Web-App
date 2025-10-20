@@ -9,6 +9,7 @@ import { getState, ROLES_CONST } from "../state/store.js";
 const routes = {
   "":          { view: () => import("../pages/login.js").then(m => m.render),        meta: { public: true } },
   "login":     { view: () => import("../pages/login.js").then(m => m.render),        meta: { public: true } },
+  "dispositivos": { view: () => import("../pages/dispositivos.js").then(m => m.render), meta: { roles: [ROLES_CONST.ADMIN, ROLES_CONST.ACTION, ROLES_CONST.READONLY] } },
   "dashboard": { view: () => import("../pages/dashboard.js").then(m => m.render),    meta: { roles: [ROLES_CONST.ADMIN, ROLES_CONST.ACTION, ROLES_CONST.READONLY] } },
   "sobre-nosotros": { view: () => import("../pages/sobreNosotros.js").then(m => m.render), meta: { public: true } },
   "configuracion": { view: () => import("../pages/configuracion.js").then(m => m.render), meta: { roles: [ROLES_CONST.ADMIN, ROLES_CONST.ACTION, ROLES_CONST.READONLY] } },
@@ -51,4 +52,9 @@ export function initRouter() {
 
   window.addEventListener("hashchange", navigate);
   navigate();
+}
+
+// Exportar función navigate para uso en otras páginas
+export function navigate(path) {
+  location.hash = `#/${path}`;
 }
