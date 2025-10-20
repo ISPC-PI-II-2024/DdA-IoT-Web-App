@@ -7,11 +7,13 @@
 
 import { el } from "../utils/dom.js";
 import { rtClient } from "../ws.js";
+import { mqttTopicsService } from "../utils/mqttTopicsService.js";
 
 export async function temperatureChartWidget({ 
   title = "Temperatura MQTT", 
   maxPoints = 60,
-  showStats = true 
+  showStats = true,
+  topicName = null // Si se especifica, usa este tópico específico
 } = {}) {
   const root = el("div", { class: "card" },
     el("h3", {}, title),
@@ -185,11 +187,61 @@ export async function temperatureChartWidget({
   requestAnimationFrame(loop);
 
   // Suscripción a datos de temperatura desde MQTT
-  const unsubscribe = rtClient.subscribe("temperature", (msg) => {
-    if (msg.type === "temperature_update" && msg.data) {
-      pushPoint(msg.data);
+  let unsubscribe = null;
+  let currentTopic = null;
+  
+  const setupTopicSubscription = async () => {
+    try {
+      // Obtener tópicos de temperatura disponibles
+      const temperatureTopics = mqttTopicsService.getTemperatureTopics();
+      
+      // Determinar qué tópico usar
+      if (topicName) {
+        // Usar tópico específico si se proporciona
+        currentTopic = topicName;
+      } else if (temperatureTopics.length > 0) {
+        // Usar el primer tópico de temperatura disponible
+        currentTopic = temperatureTopics[0].nombre;
+      } else {
+        // Fallback al tópico por defecto
+        currentTopic = "temperature";
+      }
+      
+      console.log(`📡 Suscribiéndose a tópico de temperatura: ${currentTopic}`);
+      
+      // Suscribirse al tópico específico
+      unsubscribe = rtClient.subscribe(currentTopic, (msg) => {
+        if (msg.type === "temperature_update" && msg.data) {
+          pushPoint(msg.data);
+        } else if (msg.payload && typeof msg.payload.value === 'number') {
+          // Formato alternativo de datos
+          pushPoint({
+            timestamp: new Date().toISOString(),
+            temperature: msg.payload.value,
+            topic: currentTopic
+          });
+        }
+      });
+      
+      // Actualizar título con el tópico usado
+      const titleElement = root.querySelector("h3");
+      if (titleElement) {
+        titleElement.textContent = `${title} (${currentTopic})`;
+      }
+      
+    } catch (error) {
+      console.error("Error configurando suscripción a tópico:", error);
+      // Fallback a suscripción básica
+      unsubscribe = rtClient.subscribe("temperature", (msg) => {
+        if (msg.type === "temperature_update" && msg.data) {
+          pushPoint(msg.data);
+        }
+      });
     }
-  });
+  };
+  
+  // Configurar suscripción
+  await setupTopicSubscription();
 
   // Cargar datos históricos iniciales
   try {

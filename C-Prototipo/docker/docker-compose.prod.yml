@@ -20,7 +20,7 @@ services:
     environment:
       # Configuración básica
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=4000
       
       # JWT Configuration (CAMBIAR EN PRODUCCIÓN)
       - JWT_SECRET=${JWT_SECRET}
@@ -46,7 +46,7 @@ services:
     
     # Puertos (solo interno, no exponer directamente)
     expose:
-      - "3000"
+      - "4000"
     
     # Health check
     healthcheck:

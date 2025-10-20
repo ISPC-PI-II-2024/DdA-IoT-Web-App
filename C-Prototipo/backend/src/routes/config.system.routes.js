@@ -15,7 +15,12 @@ import {
   updateAdvancedConfig,
   getMQTTStatus,
   restartMQTTConnection,
-  clearDataCache
+  clearDataCache,
+  reloadMQTTTopics,
+  getMQTTTopics,
+  createMQTTTopic,
+  updateMQTTTopic,
+  deleteMQTTTopic
 } from "../controllers/config.controllers.js";
 import { requireAuth, requireRole } from "../middlewares/auth.middlewares.js";
 
@@ -30,7 +35,14 @@ router.put("/advanced", requireAuth, requireRole(["admin"]), updateAdvancedConfi
 
 // Estado y acciones administrativas
 router.get("/mqtt/status", requireAuth, getMQTTStatus);
+router.get("/mqtt/topics", requireAuth, getMQTTTopics);
 router.post("/mqtt/restart", requireAuth, requireRole(["admin"]), restartMQTTConnection);
+router.post("/mqtt/reload-topics", requireAuth, requireRole(["admin"]), reloadMQTTTopics);
 router.post("/cache/clear", requireAuth, requireRole(["admin"]), clearDataCache);
+
+// CRUD de tópicos MQTT (solo admin)
+router.post("/mqtt/topics", requireAuth, requireRole(["admin"]), createMQTTTopic);
+router.put("/mqtt/topics/:id", requireAuth, requireRole(["admin"]), updateMQTTTopic);
+router.delete("/mqtt/topics/:id", requireAuth, requireRole(["admin"]), deleteMQTTTopic);
 
 export default router

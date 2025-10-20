@@ -3,18 +3,15 @@
 // ==========================
 import { el } from "../utils/dom.js";
 import { getState, setDevices } from "../state/store.js";
-import { DevicesAPI } from "../api.js";
+import { deviceService } from "../utils/deviceService.js";
 
 export async function generalStatusWidget() {
   const { devices } = getState();
   
-  // Cargar dispositivos si no están cargados
+  // Cargar dispositivos si no están cargados (solo una vez)
   if (devices.length === 0) {
     try {
-      const response = await DevicesAPI.getAllDevices();
-      if (response.success) {
-        setDevices(response.data);
-      }
+      await deviceService.getAllDevices();
     } catch (error) {
       console.error('Error cargando dispositivos:', error);
     }
@@ -26,9 +23,9 @@ export async function generalStatusWidget() {
   async function getDeviceCriticalStatus(device) {
     try {
       // Obtener datos recientes del dispositivo (últimos 10 registros)
-      const sensorData = await DevicesAPI.getDeviceSensorData(device.id_dispositivo, 10);
+      const sensorData = await deviceService.getDeviceSensorData(device.id_dispositivo, 10);
       
-      if (!sensorData.success || sensorData.data.length === 0) {
+      if (!sensorData || sensorData.length === 0) {
         return {
           status: 'no_data',
           color: '#FF9800', // Naranja para sin datos
@@ -52,7 +49,7 @@ export async function generalStatusWidget() {
       let criticalSensors = [];
 
       // Verificar cada dato de sensor
-      for (const data of sensorData.data) {
+      for (const data of sensorData) {
         const threshold = criticalThresholds[data.tipo_sensor];
         if (threshold) {
           const value = parseFloat(data.valor);

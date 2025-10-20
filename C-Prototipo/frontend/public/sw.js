@@ -33,7 +33,10 @@ self.addEventListener("fetch", e => {
     try {
       const net = await fetch(req);
       // Cachear solo respuestas OK
-      if (net.ok) caches.open(CACHE).then(c => c.put(req, net.clone()));
+      if (net.ok) {
+        const clonedResponse = net.clone();
+        caches.open(CACHE).then(c => c.put(req, clonedResponse));
+      }
       return net;
     } catch {
       const cached = await caches.match(req);

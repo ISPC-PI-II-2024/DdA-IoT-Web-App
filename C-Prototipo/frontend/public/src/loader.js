@@ -1,7 +1,7 @@
 // loader.js — carga config y arranca la app, con fallback si /config.json no existe
 const defaults = {
-  API_URL: `http://${location.hostname}:3000/api`,
-  WS_URL:  `ws://${location.hostname}:3000/ws`,
+  API_URL: `http://${location.hostname}:4000/api`,
+  WS_URL:  `ws://${location.hostname}:4000/ws`,
   GOOGLE_CLIENT_ID: "",
   ROLES: { ADMIN: "admin", ACTION: "action", READONLY: "readonly", GUEST: "guest" }
 };

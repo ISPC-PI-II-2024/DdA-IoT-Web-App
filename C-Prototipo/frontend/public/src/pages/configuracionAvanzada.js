@@ -7,6 +7,8 @@ import { el } from "../utils/dom.js";
 import { getState } from "../state/store.js";
 import { ConfigAPI } from "../api.js";
 import { configService } from "../utils/configService.js";
+import { mqttTopicsService } from "../utils/mqttTopicsService.js";
+import { mqttTopicsManager } from "../components/mqttTopicsManager.js";
 
 export async function render() {
   const { role } = getState();
@@ -140,18 +142,24 @@ export async function render() {
   const configMQTT = el("div", { class: "card" },
     el("h3", {}, "Configuración MQTT"),
     el("div", { class: "form-section" },
+      // Información de tópicos disponibles
       el("div", { class: "form-group" },
-        el("label", { for: "mqtt_topics" }, "Topics MQTT (separados por coma):"),
-        el("textarea", { 
-          id: "mqtt_topics", 
-          name: "mqtt_topics", 
-          rows: "3",
-          placeholder: "vittoriodurigutti/prueba,vittoriodurigutti/temperature"
-        })
+        el("label", {}, "Tópicos MQTT Disponibles:"),
+        el("div", { 
+          id: "mqtt-topics-info",
+          class: "info-grid",
+          style: "margin-top: 10px;"
+        }),
+        el("button", {
+          type: "button",
+          id: "refresh-topics-btn",
+          class: "btn btn-sm btn-outline",
+          style: "margin-top: 10px;"
+        }, "🔄 Actualizar Tópicos")
       ),
       
       el("div", { class: "form-group" },
-        el("label", { for: "mqtt_qos_level" }, "Nivel QoS:"),
+        el("label", { for: "mqtt_qos_level" }, "Nivel QoS por defecto:"),
         el("select", { id: "mqtt_qos_level", name: "mqtt_qos_level" },
           el("option", { value: "0" }, "QoS 0 - Al menos una vez"),
           el("option", { value: "1" }, "QoS 1 - Exactamente una vez"),
@@ -169,6 +177,28 @@ export async function render() {
           value: "30000",
           placeholder: "30000"
         })
+      ),
+      
+      // Acciones administrativas MQTT
+      el("div", { class: "form-group" },
+        el("label", {}, "Acciones Administrativas:"),
+        el("div", { class: "actions-grid" },
+          el("button", {
+            type: "button",
+            id: "reload-mqtt-topics-btn",
+            class: "btn btn-sm btn-action"
+          }, "🔄 Recargar Tópicos desde DB"),
+          el("button", {
+            type: "button",
+            id: "restart-mqtt-btn",
+            class: "btn btn-sm btn-danger"
+          }, "🔄 Reiniciar Conexión MQTT"),
+          el("button", {
+            type: "button",
+            id: "clear-cache-btn",
+            class: "btn btn-sm btn-warning"
+          }, "🗑️ Limpiar Cache")
+        )
       )
     )
   );
@@ -273,7 +303,6 @@ export async function render() {
         realTime: document.getElementById("enable_real_time").checked
       },
       mqtt: {
-        topics: document.getElementById("mqtt_topics").value.split(',').map(t => t.trim()),
         qosLevel: parseInt(document.getElementById("mqtt_qos_level").value),
         timeout: parseInt(document.getElementById("mqtt_timeout").value) || 30000
       },
@@ -415,7 +444,6 @@ export async function render() {
 
       // Cargar configuración MQTT
       if (config.mqtt) {
-        document.getElementById("mqtt_topics").value = config.mqtt.topics?.join(", ") || "";
         document.getElementById("mqtt_qos_level").value = config.mqtt.qosLevel || "1";
         document.getElementById("mqtt_timeout").value = config.mqtt.timeout || 30000;
       }
@@ -433,8 +461,168 @@ export async function render() {
     }
   };
 
+  const loadMQTTTopics = async () => {
+    try {
+      const topics = await mqttTopicsService.loadTopics();
+      const stats = mqttTopicsService.getStats();
+      const connectionInfo = await mqttTopicsService.getConnectionInfo();
+      
+      const topicsInfo = document.getElementById("mqtt-topics-info");
+      if (!topicsInfo) return;
+      
+      // Limpiar contenido anterior
+      topicsInfo.innerHTML = "";
+      
+      // Información de conexión
+      if (connectionInfo) {
+        const statusColor = connectionInfo.connected ? "var(--color-exito)" : "var(--color-error)";
+        const statusText = connectionInfo.connected ? "Conectado" : "Desconectado";
+        
+        topicsInfo.appendChild(el("div", { class: "info-item" },
+          el("strong", {}, "Estado MQTT:"),
+          el("span", { style: `color: ${statusColor}; font-weight: bold;` }, statusText)
+        ));
+        
+        topicsInfo.appendChild(el("div", { class: "info-item" },
+          el("strong", {}, "Broker:"),
+          el("span", {}, connectionInfo.brokerUrl || "N/A")
+        ));
+        
+        topicsInfo.appendChild(el("div", { class: "info-item" },
+          el("strong", {}, "Fuente:"),
+          el("span", {}, connectionInfo.topicsFromDB ? "Base de datos" : "Variables de entorno")
+        ));
+      }
+      
+      // Estadísticas de tópicos
+      topicsInfo.appendChild(el("div", { class: "info-item" },
+        el("strong", {}, "Total de tópicos:"),
+        el("span", {}, stats.total.toString())
+      ));
+      
+      // Tópicos por tipo
+      Object.entries(stats.byType).forEach(([type, count]) => {
+        topicsInfo.appendChild(el("div", { class: "info-item" },
+          el("strong", {}, `${type.charAt(0).toUpperCase() + type.slice(1)}:`),
+          el("span", {}, count.toString())
+        ));
+      });
+      
+      // Lista de tópicos disponibles
+      if (topics.length > 0) {
+        const topicsList = el("div", { class: "info-item" },
+          el("strong", {}, "Tópicos disponibles:"),
+          el("div", { style: "margin-top: 5px; max-height: 150px; overflow-y: auto;" })
+        );
+        
+        const listContainer = topicsList.querySelector("div");
+        
+        topics.forEach(topic => {
+          const topicItem = el("div", { 
+            class: "info-item",
+            style: "padding: 5px; border-left: 3px solid var(--color-primario); margin-bottom: 5px; background: #f8f9fa;"
+          },
+            el("div", { style: "font-weight: bold; color: var(--color-primario);" }, topic.nombre),
+            el("div", { style: "font-size: 0.85rem; color: var(--color-texto-secundario);" }, 
+              topic.descripcion || "Sin descripción"
+            ),
+            el("div", { style: "font-size: 0.8rem; color: var(--color-texto-secundario);" },
+              `Tipo: ${topic.tipo_datos} | QoS: ${topic.qos_level}${topic.dispositivo_asociado ? ` | Dispositivo: ${topic.dispositivo_asociado}` : ''}`
+            )
+          );
+          
+          listContainer.appendChild(topicItem);
+        });
+        
+        topicsInfo.appendChild(topicsList);
+      } else {
+        topicsInfo.appendChild(el("div", { class: "info-item" },
+          el("span", { style: "color: var(--color-warning);" }, "No hay tópicos disponibles")
+        ));
+      }
+      
+    } catch (error) {
+      console.error("Error cargando tópicos MQTT:", error);
+      const topicsInfo = document.getElementById("mqtt-topics-info");
+      if (topicsInfo) {
+        topicsInfo.innerHTML = el("div", { class: "error" },
+          "Error cargando tópicos MQTT: " + error.message
+        ).outerHTML;
+      }
+    }
+  };
+
+  // Event listeners para botones MQTT
+  const setupMQTTEventListeners = () => {
+    // Botón para actualizar tópicos
+    const refreshBtn = document.getElementById("refresh-topics-btn");
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", loadMQTTTopics);
+    }
+    
+    // Botón para recargar tópicos desde DB
+    const reloadBtn = document.getElementById("reload-mqtt-topics-btn");
+    if (reloadBtn) {
+      reloadBtn.addEventListener("click", async () => {
+        try {
+          const result = await mqttTopicsService.reloadTopics();
+          if (result) {
+            alert("Tópicos MQTT recargados exitosamente");
+            await loadMQTTTopics();
+          } else {
+            alert("Error recargando tópicos MQTT");
+          }
+        } catch (error) {
+          alert("Error recargando tópicos: " + error.message);
+        }
+      });
+    }
+    
+    // Botón para reiniciar conexión MQTT
+    const restartBtn = document.getElementById("restart-mqtt-btn");
+    if (restartBtn) {
+      restartBtn.addEventListener("click", async () => {
+        try {
+          const response = await ConfigAPI.restartMQTTConnection();
+          if (response.success) {
+            alert("Conexión MQTT reiniciada exitosamente");
+            await loadMQTTTopics();
+          } else {
+            alert("Error reiniciando conexión MQTT");
+          }
+        } catch (error) {
+          alert("Error reiniciando conexión: " + error.message);
+        }
+      });
+    }
+    
+    // Botón para limpiar cache
+    const clearCacheBtn = document.getElementById("clear-cache-btn");
+    if (clearCacheBtn) {
+      clearCacheBtn.addEventListener("click", async () => {
+        try {
+          const response = await ConfigAPI.clearDataCache();
+          if (response.success) {
+            alert("Cache de datos limpiado exitosamente");
+          } else {
+            alert("Error limpiando cache");
+          }
+        } catch (error) {
+          alert("Error limpiando cache: " + error.message);
+        }
+      });
+    }
+  };
+
   // Cargar configuración cuando se monta el componente
-  setTimeout(loadAdvancedConfig, 100);
+  setTimeout(async () => {
+    await loadAdvancedConfig();
+    await loadMQTTTopics();
+    setupMQTTEventListeners();
+  }, 100);
+
+  // Crear el componente de gestión de tópicos MQTT
+  const mqttTopicsManagerComponent = await mqttTopicsManager();
 
   return el("div", { class: "advanced-config-container" },
     el("div", { class: "config-header" },
@@ -456,6 +644,9 @@ export async function render() {
       el("div", {}, umbralesTemperatura, triggersGraficos),
       el("div", {}, configMQTT, notificacionesAvanzadas)
     ),
+    
+    // Gestión de tópicos MQTT
+    mqttTopicsManagerComponent,
     
     accionesAdmin
   );

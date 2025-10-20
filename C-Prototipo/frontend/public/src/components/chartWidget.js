@@ -6,8 +6,14 @@
 
 import { el } from "../utils/dom.js";
 import { rtClient } from "../ws.js";
+import { mqttTopicsService } from "../utils/mqttTopicsService.js";
 
-export async function chartWidget({ title = "Tiempo real", topic = "metrics/demo", maxPoints = 120 } = {}) {
+export async function chartWidget({ 
+  title = "Tiempo real", 
+  topic = "metrics/demo", 
+  maxPoints = 120,
+  topicType = null // Tipo específico de tópico a usar
+} = {}) {
   const root = el("div", { class: "card" },
     el("h3", {}, title),
     el("canvas", { width: 900, height: 240, style: "max-width:100%;height:auto;border:1px solid #242b36;border-radius:8px" })
@@ -74,16 +80,51 @@ export async function chartWidget({ title = "Tiempo real", topic = "metrics/demo
   requestAnimationFrame(loop);
 
   // Suscripción al tópico
-  const off = rtClient.subscribe(topic, (msg) => {
-    const val = Number(msg?.payload?.value);
-    if (!Number.isFinite(val)) return;
-    pushPoint(val);
-  });
+  let unsubscribe = null;
+  let currentTopic = topic;
+  
+  const setupTopicSubscription = async () => {
+    try {
+      // Si se especifica un tipo de tópico, buscar tópicos de ese tipo
+      if (topicType) {
+        const topicsByType = mqttTopicsService.getTopicsByType(topicType);
+        if (topicsByType.length > 0) {
+          currentTopic = topicsByType[0].nombre;
+          console.log(`📡 Usando tópico de tipo '${topicType}': ${currentTopic}`);
+        }
+      }
+      
+      // Suscribirse al tópico
+      unsubscribe = rtClient.subscribe(currentTopic, (msg) => {
+        const val = Number(msg?.payload?.value);
+        if (!Number.isFinite(val)) return;
+        pushPoint(val);
+      });
+      
+      // Actualizar título con el tópico usado
+      const titleElement = root.querySelector("h3");
+      if (titleElement) {
+        titleElement.textContent = `${title} (${currentTopic})`;
+      }
+      
+    } catch (error) {
+      console.error("Error configurando suscripción:", error);
+      // Fallback a suscripción básica
+      unsubscribe = rtClient.subscribe(topic, (msg) => {
+        const val = Number(msg?.payload?.value);
+        if (!Number.isFinite(val)) return;
+        pushPoint(val);
+      });
+    }
+  };
+  
+  // Configurar suscripción
+  await setupTopicSubscription();
 
   // Limpieza si el nodo sale del DOM
   const observer = new MutationObserver(() => {
     if (!document.body.contains(root)) {
-      off();
+      if (unsubscribe) unsubscribe();
       observer.disconnect();
     }
   });

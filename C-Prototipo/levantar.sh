@@ -69,7 +69,7 @@ echo ""
 echo "=========================="
 echo " Verificando configuración "
 echo "=========================="
-if [ ! -f "env" ]; then
+if [ ! -f ".env" ]; then
     echo "❌ Error: No se encontró el archivo 'env' en la raíz del proyecto"
     echo "   Crea el archivo env con las variables de configuración necesarias"
     exit 1

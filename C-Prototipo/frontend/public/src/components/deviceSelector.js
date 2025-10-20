@@ -3,18 +3,15 @@
 // ==========================
 import { el } from "../utils/dom.js";
 import { getState, setDevices, selectDevice } from "../state/store.js";
-import { DevicesAPI } from "../api.js";
+import { deviceService } from "../utils/deviceService.js";
 
 export async function deviceSelectorWidget() {
   const { devices, selectedDevice } = getState();
   
-  // Cargar dispositivos si no están cargados
+  // Cargar dispositivos si no están cargados (solo una vez)
   if (devices.length === 0) {
     try {
-      const response = await DevicesAPI.getAllDevices();
-      if (response.success) {
-        setDevices(response.data);
-      }
+      await deviceService.getAllDevices();
     } catch (error) {
       console.error('Error cargando dispositivos:', error);
     }

@@ -1,12 +1,12 @@
 -- =========================
--- Script de inicialización de MariaDB para WebAPP-DB
+-- Script de inicialización de MariaDB para silo_db
 -- =========================
 
 -- Crear base de datos si no existe
-CREATE DATABASE IF NOT EXISTS `WebAPP-DB` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS `silo_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Usar la base de datos
-USE `WebAPP-DB`;
+USE `silo_db`;
 
 -- Tabla de usuarios (vinculados con Google)
 CREATE TABLE IF NOT EXISTS usuarios (
@@ -173,6 +173,24 @@ CREATE TABLE IF NOT EXISTS configuraciones_sistema (
     fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- Tabla de tópicos MQTT
+CREATE TABLE IF NOT EXISTS mqtt_topics (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(255) UNIQUE NOT NULL,
+    descripcion TEXT,
+    activo BOOLEAN DEFAULT TRUE,
+    qos_level TINYINT DEFAULT 1,
+    tipo_datos ENUM('temperatura', 'humedad', 'presion', 'general', 'comando') DEFAULT 'general',
+    dispositivo_asociado VARCHAR(100),
+    metadatos JSON DEFAULT ('{}'),
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (dispositivo_asociado) REFERENCES dispositivos(id_dispositivo) ON DELETE SET NULL,
+    INDEX idx_mqtt_topics_activo (activo),
+    INDEX idx_mqtt_topics_tipo (tipo_datos),
+    INDEX idx_mqtt_topics_dispositivo (dispositivo_asociado)
+);
+
 -- Insertar roles base
 INSERT IGNORE INTO roles (nombre, nombre_mostrar, descripcion) VALUES
 ('administrador', 'Administrador', 'Acceso completo al sistema, gestión de usuarios y configuración'),
@@ -245,6 +263,15 @@ INSERT IGNORE INTO configuraciones_sistema (clave, valor, descripcion, tipo) VAL
 ('backup_automatico', 'true', 'Habilitar backup automático de la base de datos', 'boolean'),
 ('log_level', 'info', 'Nivel de logging del sistema', 'string');
 
+-- Insertar tópicos MQTT por defecto
+INSERT IGNORE INTO mqtt_topics (nombre, descripcion, activo, qos_level, tipo_datos, metadatos) VALUES
+('vittoriodurigutti/prueba', 'Tópico de prueba general', TRUE, 1, 'general', '{"test": true, "source": "manual"}'),
+('vittoriodurigutti/temperature', 'Datos de temperatura del sensor principal', TRUE, 1, 'temperatura', '{"unit": "celsius", "precision": 2}'),
+('vittoriodurigutti/sensor/+', 'Tópico wildcard para todos los sensores', TRUE, 1, 'general', '{"wildcard": true, "pattern": "sensor/*"}'),
+('vittoriodurigutti/humidity', 'Datos de humedad del sensor', TRUE, 1, 'humedad', '{"unit": "percent", "precision": 1}'),
+('vittoriodurigutti/pressure', 'Datos de presión atmosférica', TRUE, 1, 'presion', '{"unit": "hPa", "precision": 2}'),
+('vittoriodurigutti/commands', 'Tópico para comandos hacia dispositivos', TRUE, 2, 'comando', '{"bidirectional": true}');
+
 -- Crear proyecto por defecto
 INSERT IGNORE INTO proyectos (nombre, descripcion, estado, creado_por) VALUES
 ('Proyecto Principal', 'Proyecto principal del sistema TST-DA', 'activo', 1);
@@ -273,9 +300,9 @@ CREATE INDEX IF NOT EXISTS idx_usuarios_proyectos_proyecto_id ON usuarios_proyec
 CREATE DATABASE IF NOT EXISTS npm_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Crear usuario específico para la aplicación (si no existe)
-CREATE USER IF NOT EXISTS 'webapp_user'@'%' IDENTIFIED BY 'webapp_password_2024';
-GRANT ALL PRIVILEGES ON `WebAPP-DB`.* TO 'webapp_user'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON npm_db.* TO 'webapp_user'@'%';
+CREATE USER IF NOT EXISTS 'silo_user'@'%' IDENTIFIED BY 'user@siloiot2015';
+GRANT ALL PRIVILEGES ON `silo_db`.* TO 'silo_user'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON npm_db.* TO 'silo_user'@'%';
 FLUSH PRIVILEGES;
 
 -- Crear vistas útiles para reportes

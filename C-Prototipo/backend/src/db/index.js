@@ -9,14 +9,14 @@ import { ENV } from "../config/env.js";
 export const pool = mariadb.createPool({
   host: ENV.MYSQL_HOST,
   user: ENV.MYSQL_USER,
-  password: ENV.MYSQL_ROOT_PASSWORD,
-  database: 'WebAPP-DB',
+  password: ENV.MYSQL_PASSWORD,
+  database: ENV.MYSQL_DATABASE,
   connectionLimit: 5
 });
 
 export const influxDB = new InfluxDB({
-  host: ENV.INFLUXDB_HOST || 'localhost',
-  port: ENV.INFLUXDB_PORT || 8086,
+  host: ENV.INFLUXDB_HOST,
+  port: ENV.INFLUXDB_PORT,
   database: ENV.INFLUXDB_DB,
   username: ENV.INFLUXDB_USER,
   password: ENV.INFLUXDB_USER_PASSWORD,

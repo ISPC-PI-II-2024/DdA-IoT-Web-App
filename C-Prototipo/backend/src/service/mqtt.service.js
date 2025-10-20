@@ -1,9 +1,11 @@
 // ==========================
 // Servicio MQTT para conectar con Mosquitto
 // Configuración completa desde .env: host, port, usuario, contraseña, topics
+// Los tópicos se obtienen desde la base de datos con fallback a ENV
 // ==========================
 import mqtt from "mqtt";
 import { ENV } from "../config/env.js";
+import { pool } from "../db/index.js";
 
 class MQTTService {
   constructor() {
@@ -14,15 +16,77 @@ class MQTTService {
     this.subscribers = new Set(); // Para WebSocket broadcasting
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 10;
+    this.topics = []; // Tópicos obtenidos desde DB
+    this.topicsFromDB = false; // Flag para saber si se obtuvieron desde DB
   }
 
-  connect() {
+  /**
+   * Carga los tópicos MQTT desde la base de datos
+   * Si falla, usa los tópicos de las variables de entorno como fallback
+   */
+  async loadTopicsFromDB() {
+    try {
+      const conn = await pool.getConnection();
+      
+      // Intentar obtener tópicos desde la tabla mqtt_topics
+      const [topicsRows] = await conn.execute(`
+        SELECT nombre, qos_level, tipo_datos, metadatos 
+        FROM mqtt_topics 
+        WHERE activo = TRUE 
+        ORDER BY fecha_creacion ASC
+      `);
+      
+      conn.release();
+      
+      if (topicsRows.length > 0) {
+        this.topics = topicsRows.map(row => row.nombre);
+        this.topicsFromDB = true;
+        console.log(`✅ Tópicos cargados desde DB: ${this.topics.length} tópicos`);
+        
+        // Log de información adicional de los tópicos
+        topicsRows.forEach(topic => {
+          console.log(`  📡 ${topic.nombre} (QoS: ${topic.qos_level}, Tipo: ${topic.tipo_datos})`);
+        });
+        
+        return;
+      }
+      
+      // Si no hay tópicos en la tabla específica, intentar desde configuraciones_sistema
+      const conn2 = await pool.getConnection();
+      const [configRows] = await conn2.execute(`
+        SELECT valor FROM configuraciones_sistema 
+        WHERE clave = 'mqtt_topics_default' AND valor IS NOT NULL
+      `);
+      conn2.release();
+      
+      if (configRows.length > 0 && configRows[0].valor) {
+        this.topics = configRows[0].valor.split(',').map(t => t.trim()).filter(Boolean);
+        this.topicsFromDB = true;
+        console.log(`✅ Tópicos cargados desde configuraciones_sistema: ${this.topics.length} tópicos`);
+        return;
+      }
+      
+    } catch (error) {
+      console.error("❌ Error cargando tópicos desde DB:", error.message);
+    }
+    
+    // Fallback a variables de entorno
+    this.topics = [...ENV.MQTT_TOPICS];
+    this.topicsFromDB = false;
+    console.log(`⚠️ Usando tópicos de ENV como fallback: ${this.topics.length} tópicos`);
+  }
+
+  async connect() {
+    // Obtener tópicos desde la base de datos primero
+    await this.loadTopicsFromDB();
+    
     // Construir URL del broker desde configuración ENV
     const brokerUrl = this.buildBrokerUrl();
     const clientOptions = this.buildClientOptions();
     
     console.log(`🔌 Conectando a MQTT broker: ${brokerUrl}`);
-    console.log(`📡 Topics configurados: ${ENV.MQTT_TOPICS.join(", ")}`);
+    console.log(`📡 Topics configurados: ${this.topics.join(", ")}`);
+    console.log(`📊 Fuente de tópicos: ${this.topicsFromDB ? 'Base de datos' : 'Variables de entorno'}`);
     
     this.client = mqtt.connect(brokerUrl, clientOptions);
 
@@ -101,9 +165,9 @@ class MQTTService {
       return;
     }
 
-    console.log(`📡 Suscribiéndose a ${ENV.MQTT_TOPICS.length} topics...`);
+    console.log(`📡 Suscribiéndose a ${this.topics.length} topics...`);
 
-    ENV.MQTT_TOPICS.forEach(topic => {
+    this.topics.forEach(topic => {
       this.client.subscribe(topic, { qos: 1 }, (err) => {
         if (err) {
           console.error(`❌ Error suscribiéndose a ${topic}:`, err);
@@ -251,10 +315,31 @@ class MQTTService {
     return {
       connected: this.isConnected,
       brokerUrl: this.buildBrokerUrl(),
-      topics: ENV.MQTT_TOPICS,
+      topics: this.topics,
+      topicsFromDB: this.topicsFromDB,
       subscriberCount: this.subscribers.size,
       dataCount: this.temperatureData.length,
       reconnectAttempts: this.reconnectAttempts
+    };
+  }
+
+  /**
+   * Recarga los tópicos desde la base de datos
+   * Útil para actualizar tópicos sin reiniciar el servicio
+   */
+  async reloadTopics() {
+    console.log("🔄 Recargando tópicos desde la base de datos...");
+    await this.loadTopicsFromDB();
+    
+    if (this.isConnected) {
+      console.log("📡 Re-suscribiéndose a los nuevos tópicos...");
+      this.subscribeToTopics();
+    }
+    
+    return {
+      topics: this.topics,
+      topicsFromDB: this.topicsFromDB,
+      count: this.topics.length
     };
   }
 

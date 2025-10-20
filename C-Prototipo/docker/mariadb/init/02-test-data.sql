@@ -1,7 +1,7 @@
 -- Script para insertar dispositivos de prueba en la base de datos
 -- Este script debe ejecutarse después de la inicialización de la base de datos
 
-USE `TST-DA`;
+USE `silo_db`;
 
 -- Insertar dispositivos de prueba
 INSERT IGNORE INTO dispositivos (id_dispositivo, nombre, tipo, ubicacion, estado, ultima_conexion, metadatos) VALUES

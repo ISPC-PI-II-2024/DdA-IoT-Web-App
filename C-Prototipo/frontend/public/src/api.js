@@ -96,12 +96,33 @@ export const ConfigAPI = {
     return request("/config/mqtt/status", { auth: true });
   },
   
+  getMQTTTopics() {
+    return request("/config/mqtt/topics", { auth: true });
+  },
+  
   restartMQTTConnection() {
     return request("/config/mqtt/restart", { method: "POST", auth: true });
   },
   
+  reloadMQTTTopics() {
+    return request("/config/mqtt/reload-topics", { method: "POST", auth: true });
+  },
+  
   clearDataCache() {
     return request("/config/cache/clear", { method: "POST", auth: true });
+  },
+
+  // CRUD de tópicos MQTT (solo admin)
+  createMQTTTopic(topicData) {
+    return request("/config/mqtt/topics", { method: "POST", body: topicData, auth: true });
+  },
+
+  updateMQTTTopic(topicId, topicData) {
+    return request(`/config/mqtt/topics/${topicId}`, { method: "PUT", body: topicData, auth: true });
+  },
+
+  deleteMQTTTopic(topicId) {
+    return request(`/config/mqtt/topics/${topicId}`, { method: "DELETE", auth: true });
   }
 };
 

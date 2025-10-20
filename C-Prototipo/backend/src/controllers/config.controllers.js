@@ -228,6 +228,381 @@ export async function clearDataCache(req, res) {
   }
 }
 
+export async function reloadMQTTTopics(req, res) {
+  try {
+    // Solo admin puede recargar tópicos
+    if (req.user?.role !== "admin") {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Acceso denegado. Solo administradores" 
+      });
+    }
+
+    const mqttService = await import("../service/mqtt.service.js").then(m => m.mqttService);
+    
+    // Recargar tópicos desde la base de datos
+    const result = await mqttService.reloadTopics();
+    
+    console.log("Tópicos MQTT recargados por:", req.user.email);
+    console.log("Nuevos tópicos:", result.topics);
+
+    res.json({
+      success: true,
+      message: "Tópicos MQTT recargados exitosamente",
+      data: result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Error recargando tópicos MQTT:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Error interno del servidor" 
+    });
+  }
+}
+
+export async function getMQTTTopics(req, res) {
+  try {
+    // Todos los usuarios autenticados pueden ver los tópicos disponibles
+    const mqttService = await import("../service/mqtt.service.js").then(m => m.mqttService);
+    
+    // Obtener información detallada de los tópicos desde la base de datos
+    const { pool } = await import("../db/index.js");
+    const conn = await pool.getConnection();
+    
+    const [topicsRows] = await conn.execute(`
+      SELECT 
+        id,
+        nombre, 
+        descripcion, 
+        qos_level, 
+        tipo_datos, 
+        dispositivo_asociado,
+        metadatos,
+        activo,
+        fecha_creacion,
+        fecha_actualizacion
+      FROM mqtt_topics 
+      WHERE activo = TRUE 
+      ORDER BY tipo_datos, nombre ASC
+    `);
+    
+    conn.release();
+    
+    // También obtener información de conexión actual
+    const connectionInfo = mqttService.getConnectionInfo();
+    
+    res.json({
+      success: true,
+      data: {
+        topics: topicsRows,
+        currentTopics: connectionInfo.topics,
+        topicsFromDB: connectionInfo.topicsFromDB,
+        connectionStatus: connectionInfo.connected,
+        brokerUrl: connectionInfo.brokerUrl
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Error obteniendo tópicos MQTT:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Error interno del servidor" 
+    });
+  }
+}
+
+export async function createMQTTTopic(req, res) {
+  try {
+    // Solo admin puede crear tópicos
+    if (req.user?.role !== "admin") {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Acceso denegado. Solo administradores" 
+      });
+    }
+
+    const { nombre, descripcion, qos_level, tipo_datos, dispositivo_asociado, metadatos } = req.body;
+    
+    if (!nombre) {
+      return res.status(400).json({
+        success: false,
+        error: "Nombre del tópico es requerido"
+      });
+    }
+
+    // Validar QoS level
+    if (qos_level && ![0, 1, 2].includes(parseInt(qos_level))) {
+      return res.status(400).json({
+        success: false,
+        error: "QoS level debe ser 0, 1 o 2"
+      });
+    }
+
+    // Validar tipo de datos
+    const validTypes = ['temperatura', 'humedad', 'presion', 'general', 'comando'];
+    if (tipo_datos && !validTypes.includes(tipo_datos)) {
+      return res.status(400).json({
+        success: false,
+        error: `Tipo de datos debe ser uno de: ${validTypes.join(', ')}`
+      });
+    }
+
+    const { pool } = await import("../db/index.js");
+    const conn = await pool.getConnection();
+    
+    // Verificar que el tópico no exista
+    const [existingTopic] = await conn.execute(
+      "SELECT id FROM mqtt_topics WHERE nombre = ?",
+      [nombre]
+    );
+    
+    if (existingTopic.length > 0) {
+      conn.release();
+      return res.status(409).json({
+        success: false,
+        error: "Ya existe un tópico con ese nombre"
+      });
+    }
+
+    // Crear el tópico
+    const [result] = await conn.execute(`
+      INSERT INTO mqtt_topics (nombre, descripcion, qos_level, tipo_datos, dispositivo_asociado, metadatos)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [
+      nombre,
+      descripcion || null,
+      qos_level || 1,
+      tipo_datos || 'general',
+      dispositivo_asociado || null,
+      metadatos ? JSON.stringify(metadatos) : '{}'
+    ]);
+
+    conn.release();
+
+    console.log(`✅ Nuevo tópico MQTT creado: ${nombre} por ${req.user.email}`);
+
+    res.json({
+      success: true,
+      data: {
+        id: result.insertId,
+        nombre,
+        descripcion,
+        qos_level: qos_level || 1,
+        tipo_datos: tipo_datos || 'general',
+        dispositivo_asociado,
+        metadatos: metadatos || {}
+      },
+      message: "Tópico MQTT creado exitosamente",
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Error creando tópico MQTT:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Error interno del servidor" 
+    });
+  }
+}
+
+export async function updateMQTTTopic(req, res) {
+  try {
+    // Solo admin puede actualizar tópicos
+    if (req.user?.role !== "admin") {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Acceso denegado. Solo administradores" 
+      });
+    }
+
+    const { id } = req.params;
+    const { nombre, descripcion, qos_level, tipo_datos, dispositivo_asociado, metadatos, activo } = req.body;
+    
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: "ID del tópico es requerido"
+      });
+    }
+
+    // Validar QoS level
+    if (qos_level && ![0, 1, 2].includes(parseInt(qos_level))) {
+      return res.status(400).json({
+        success: false,
+        error: "QoS level debe ser 0, 1 o 2"
+      });
+    }
+
+    // Validar tipo de datos
+    const validTypes = ['temperatura', 'humedad', 'presion', 'general', 'comando'];
+    if (tipo_datos && !validTypes.includes(tipo_datos)) {
+      return res.status(400).json({
+        success: false,
+        error: `Tipo de datos debe ser uno de: ${validTypes.join(', ')}`
+      });
+    }
+
+    const { pool } = await import("../db/index.js");
+    const conn = await pool.getConnection();
+    
+    // Verificar que el tópico exista
+    const [existingTopic] = await conn.execute(
+      "SELECT id, nombre FROM mqtt_topics WHERE id = ?",
+      [id]
+    );
+    
+    if (existingTopic.length === 0) {
+      conn.release();
+      return res.status(404).json({
+        success: false,
+        error: "Tópico no encontrado"
+      });
+    }
+
+    // Si se está cambiando el nombre, verificar que no exista otro con ese nombre
+    if (nombre && nombre !== existingTopic[0].nombre) {
+      const [duplicateTopic] = await conn.execute(
+        "SELECT id FROM mqtt_topics WHERE nombre = ? AND id != ?",
+        [nombre, id]
+      );
+      
+      if (duplicateTopic.length > 0) {
+        conn.release();
+        return res.status(409).json({
+          success: false,
+          error: "Ya existe otro tópico con ese nombre"
+        });
+      }
+    }
+
+    // Actualizar el tópico
+    const updateFields = [];
+    const updateValues = [];
+
+    if (nombre !== undefined) {
+      updateFields.push("nombre = ?");
+      updateValues.push(nombre);
+    }
+    if (descripcion !== undefined) {
+      updateFields.push("descripcion = ?");
+      updateValues.push(descripcion);
+    }
+    if (qos_level !== undefined) {
+      updateFields.push("qos_level = ?");
+      updateValues.push(qos_level);
+    }
+    if (tipo_datos !== undefined) {
+      updateFields.push("tipo_datos = ?");
+      updateValues.push(tipo_datos);
+    }
+    if (dispositivo_asociado !== undefined) {
+      updateFields.push("dispositivo_asociado = ?");
+      updateValues.push(dispositivo_asociado);
+    }
+    if (metadatos !== undefined) {
+      updateFields.push("metadatos = ?");
+      updateValues.push(JSON.stringify(metadatos));
+    }
+    if (activo !== undefined) {
+      updateFields.push("activo = ?");
+      updateValues.push(activo);
+    }
+
+    if (updateFields.length === 0) {
+      conn.release();
+      return res.status(400).json({
+        success: false,
+        error: "No hay campos para actualizar"
+      });
+    }
+
+    updateFields.push("fecha_actualizacion = CURRENT_TIMESTAMP");
+    updateValues.push(id);
+
+    await conn.execute(`
+      UPDATE mqtt_topics 
+      SET ${updateFields.join(", ")}
+      WHERE id = ?
+    `, updateValues);
+
+    conn.release();
+
+    console.log(`✅ Tópico MQTT actualizado: ID ${id} por ${req.user.email}`);
+
+    res.json({
+      success: true,
+      message: "Tópico MQTT actualizado exitosamente",
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Error actualizando tópico MQTT:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Error interno del servidor" 
+    });
+  }
+}
+
+export async function deleteMQTTTopic(req, res) {
+  try {
+    // Solo admin puede eliminar tópicos
+    if (req.user?.role !== "admin") {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Acceso denegado. Solo administradores" 
+      });
+    }
+
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: "ID del tópico es requerido"
+      });
+    }
+
+    const { pool } = await import("../db/index.js");
+    const conn = await pool.getConnection();
+    
+    // Verificar que el tópico exista
+    const [existingTopic] = await conn.execute(
+      "SELECT id, nombre FROM mqtt_topics WHERE id = ?",
+      [id]
+    );
+    
+    if (existingTopic.length === 0) {
+      conn.release();
+      return res.status(404).json({
+        success: false,
+        error: "Tópico no encontrado"
+      });
+    }
+
+    // Eliminar el tópico (soft delete - marcar como inactivo)
+    await conn.execute(
+      "UPDATE mqtt_topics SET activo = FALSE, fecha_actualizacion = CURRENT_TIMESTAMP WHERE id = ?",
+      [id]
+    );
+
+    conn.release();
+
+    console.log(`✅ Tópico MQTT eliminado: ${existingTopic[0].nombre} por ${req.user.email}`);
+
+    res.json({
+      success: true,
+      message: "Tópico MQTT eliminado exitosamente",
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Error eliminando tópico MQTT:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Error interno del servidor" 
+    });
+  }
+}
+
 // Funciones de validación
 function validateThresholds(thresholds) {
   if (thresholds.tempMinNormal && thresholds.tempMaxNormal) {

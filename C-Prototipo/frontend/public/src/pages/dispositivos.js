@@ -25,9 +25,9 @@ export async function render() {
   const currentDevices = getState().devices;
 
   // Header de la página
-  const header = el("div", { class: "card" },
-    el("h2", {}, "Vista General de Dispositivos"),
-    el("p", { class: "muted" }, "Monitoreo completo del estado de todos los dispositivos IoT del sistema")
+  const header = el("div", { class: "card card-feature" },
+    el("h2", { class: "text-2xl font-bold mb-2" }, "Vista General de Dispositivos"),
+    el("p", { class: "muted text-lg" }, "Monitoreo completo del estado de todos los dispositivos IoT del sistema")
   );
 
   // Función para determinar el estado crítico de un dispositivo

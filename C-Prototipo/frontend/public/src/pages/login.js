@@ -66,8 +66,14 @@ export async function render() {
     )
   );
 
+
   // Contenedor para GIS
-  await initGoogle(root);
+  try {
+    await initGoogle(root);
+  } catch (error) {
+    console.error("Error inicializando Google:", error);
+    // Continuar aunque falle Google
+  }
 
   return root;
 }

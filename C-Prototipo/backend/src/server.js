@@ -45,7 +45,9 @@ const server = createServer(app);
 initWebSocket(server);
 
 // Iniciar conexión MQTT
-mqttService.connect();
+mqttService.connect().catch(error => {
+  console.error("❌ Error iniciando conexión MQTT:", error);
+});
 
 // Arranque
 server.listen(ENV.PORT, () => {

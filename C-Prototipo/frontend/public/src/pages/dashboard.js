@@ -5,7 +5,7 @@ import { temperatureChartWidget } from "../components/temperatureChart.js";
 import { deviceSelectorWidget, selectedDeviceInfoWidget } from "../components/deviceSelector.js";
 import { generalStatusWidget } from "../components/generalStatusWidget.js";
 import { deviceVisualizationWidget } from "../components/deviceVisualization.js";
-import { DevicesAPI } from "../api.js";
+import { deviceService } from "../utils/deviceService.js";
 import { rtClient } from "../ws.js";
 
 export async function render() {
@@ -16,9 +16,9 @@ export async function render() {
     try { await rtClient.connect(); } catch (e) { console.error("WS connect:", e); }
   }
 
-  const header = el("div", { class: "card" },
-    el("h2", {}, "Panel de dispositivos IoT"),
-    el("p", { class: "muted" }, `Proyecto actual: ${currentProject ?? "—"}`)
+  const header = el("div", { class: "card card-feature" },
+    el("h2", { class: "text-2xl font-bold mb-2" }, "Panel de dispositivos IoT"),
+    el("p", { class: "muted text-lg" }, `Proyecto actual: ${currentProject ?? "—"}`)
   );
 
   // Widget de estado general con indicadores LED
@@ -50,13 +50,16 @@ export async function render() {
         style: "text-align: center; padding: 20px; color: #666;"
       }, "Cargando datos del dispositivo..."));
 
-      // Obtener datos del dispositivo
+      // Obtener datos del dispositivo usando el servicio optimizado
       const [deviceDetails, sensorData] = await Promise.all([
-        DevicesAPI.getDeviceById(device.id_dispositivo),
-        DevicesAPI.getDeviceSensorData(device.id_dispositivo, 50)
+        deviceService.getDeviceDetails(device.id_dispositivo),
+        deviceService.getDeviceSensorData(device.id_dispositivo, 50)
       ]);
 
-      if (deviceDetails.success && sensorData.success) {
+      if (deviceDetails && sensorData) {
+        // Obtener estadísticas del dispositivo
+        const stats = await deviceService.getDeviceStats(device.id_dispositivo);
+        
         // Crear widgets de datos específicos del dispositivo
         const deviceStats = el("div", { class: "card" },
           el("h3", {}, "Estadísticas del Dispositivo"),
@@ -65,15 +68,15 @@ export async function render() {
               el("h4", {}, "Datos de Sensores"),
               el("ul", { style: "list-style: none; padding: 0;" },
                 el("li", { style: "margin-bottom: 8px;" }, 
-                  el("strong", {}, "Total de datos: "), deviceDetails.data.stats.total_datos || 0
+                  el("strong", {}, "Total de datos: "), stats.total_datos || 0
                 ),
                 el("li", { style: "margin-bottom: 8px;" }, 
-                  el("strong", {}, "Tipos de sensores: "), deviceDetails.data.stats.tipos_sensor || 0
+                  el("strong", {}, "Tipos de sensores: "), stats.tipos_sensor || 0
                 ),
                 el("li", { style: "margin-bottom: 8px;" }, 
                   el("strong", {}, "Promedio de valores: "), 
-                  deviceDetails.data.stats.promedio_valor ? 
-                    parseFloat(deviceDetails.data.stats.promedio_valor).toFixed(2) : 'N/A'
+                  stats.promedio_valor ? 
+                    parseFloat(stats.promedio_valor).toFixed(2) : 'N/A'
                 )
               )
             ),
@@ -82,13 +85,13 @@ export async function render() {
               el("ul", { style: "list-style: none; padding: 0;" },
                 el("li", { style: "margin-bottom: 8px;" }, 
                   el("strong", {}, "Primer dato: "), 
-                  deviceDetails.data.stats.primer_dato ? 
-                    new Date(deviceDetails.data.stats.primer_dato).toLocaleString() : 'N/A'
+                  stats.primer_dato ? 
+                    new Date(stats.primer_dato).toLocaleString() : 'N/A'
                 ),
                 el("li", { style: "margin-bottom: 8px;" }, 
                   el("strong", {}, "Último dato: "), 
-                  deviceDetails.data.stats.ultimo_dato ? 
-                    new Date(deviceDetails.data.stats.ultimo_dato).toLocaleString() : 'N/A'
+                  stats.ultimo_dato ? 
+                    new Date(stats.ultimo_dato).toLocaleString() : 'N/A'
                 )
               )
             )
@@ -98,7 +101,7 @@ export async function render() {
         // Crear tabla de datos de sensores recientes
         const sensorDataTable = el("div", { class: "card" },
           el("h3", {}, "Datos de Sensores Recientes"),
-          sensorData.data.length > 0 ? 
+          sensorData.length > 0 ? 
             el("div", { style: "overflow-x: auto;" },
               el("table", { style: "width: 100%; border-collapse: collapse;" },
                 el("thead", {},
@@ -110,7 +113,7 @@ export async function render() {
                   )
                 ),
                 el("tbody", {},
-                  ...sensorData.data.slice(0, 10).map(data => 
+                  ...sensorData.slice(0, 10).map(data => 
                     el("tr", {},
                       el("td", { style: "padding: 8px; border: 1px solid #ddd;" }, data.tipo_sensor),
                       el("td", { style: "padding: 8px; border: 1px solid #ddd;" }, data.valor),
@@ -170,13 +173,25 @@ export async function render() {
       topic: "metrics/demo" 
     });
 
-    const grids = el("div", { class: "grid cols-2" },
-      el("div", { class: "card" },
-        el("h3", {}, "Estado del Dispositivo"),
-        el("ul", {},
-          el("li", {}, `Dispositivo: ${selectedDevice.nombre}`),
-          el("li", {}, `Estado: ${selectedDevice.estado}`),
-          el("li", {}, `Última conexión: ${selectedDevice.ultima_conexion ? new Date(selectedDevice.ultima_conexion).toLocaleString() : 'N/A'}`)
+    const grids = el("div", { class: "grid cols-2 grid-lg" },
+      el("div", { class: "card card-compact" },
+        el("h3", { class: "text-xl font-semibold mb-3" }, "Estado del Dispositivo"),
+        el("ul", { class: "space-y-2" },
+          el("li", { class: "flex justify-between" }, 
+            el("span", { class: "font-medium" }, "Dispositivo:"), 
+            el("span", {}, selectedDevice.nombre)
+          ),
+          el("li", { class: "flex justify-between" }, 
+            el("span", { class: "font-medium" }, "Estado:"), 
+            el("span", { class: `status-indicator ${selectedDevice.estado === 'activo' ? 'status-online' : 'status-offline'}` }, 
+              el("span", { class: "status-dot" }),
+              selectedDevice.estado
+            )
+          ),
+          el("li", { class: "flex justify-between" }, 
+            el("span", { class: "font-medium" }, "Última conexión:"), 
+            el("span", { class: "text-sm" }, selectedDevice.ultima_conexion ? new Date(selectedDevice.ultima_conexion).toLocaleString() : 'N/A')
+          )
         )
       ),
       rtChart
