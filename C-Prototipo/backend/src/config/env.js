@@ -12,7 +12,9 @@ dotenv.config({ path: rootEnvPath, override: true });
 dotenv.config({ override: false });
 
 const schema = Joi.object({
-  NODE_ENV: Joi.string().valid("development", "production", "test").default("development"),
+  NODE_ENV: Joi.string()
+    .valid("development", "production", "test")
+    .default("development"),
   PORT: Joi.number().integer().default(4000),
 
   // Seguridad JWT propia
@@ -31,7 +33,9 @@ const schema = Joi.object({
   MQTT_BROKER_PORT: Joi.number().integer().default(1883),
   MQTT_BROKER_USERNAME: Joi.string().allow("").default(""),
   MQTT_BROKER_PASSWORD: Joi.string().allow("").default(""),
-  MQTT_TOPICS: Joi.string().default("vittoriodurigutti/prueba,vittoriodurigutti/temperature,vittoriodurigutti/sensor/+"),
+  MQTT_TOPICS: Joi.string().default(
+    "vittoriodurigutti/prueba,vittoriodurigutti/temperature,vittoriodurigutti/c02,vittoriodurigutti/sensor/"
+  ),
 
   // Listas blancas para roles (en el env dentro de backend, coloquen su gmail personal)
   ADMIN_WHITELIST: Joi.string().allow("").default(""),
@@ -71,7 +75,9 @@ const schema = Joi.object({
   WEBHOOK_URL: Joi.string().default(""),
 
   // Configuración de Monitoreo
-  LOG_LEVEL: Joi.string().valid("debug", "info", "warn", "error").default("info"),
+  LOG_LEVEL: Joi.string()
+    .valid("debug", "info", "warn", "error")
+    .default("info"),
   LOG_FILE: Joi.string().default("/var/log/iot-app.log"),
   METRICS_ENABLED: Joi.string().valid("true", "false").default("false"),
   METRICS_PORT: Joi.number().integer().default(9090),
@@ -80,19 +86,22 @@ const schema = Joi.object({
   DOMAIN: Joi.string().default(""),
   SSL_EMAIL: Joi.string().email().default(""),
   REVERSE_PROXY_HOST: Joi.string().default("nginx-proxy-manager"),
-  REVERSE_PROXY_PORT: Joi.number().integer().default(80)
+  REVERSE_PROXY_PORT: Joi.number().integer().default(80),
 }).unknown();
 
 const { value, error } = schema.validate(process.env, { abortEarly: false });
 if (error) {
-  console.error("❌ ENV ERROR:", error.details.map(d => d.message).join("; "));
+  console.error(
+    "❌ ENV ERROR:",
+    error.details.map((d) => d.message).join("; ")
+  );
   process.exit(1);
 }
 
 function parseList(s) {
   return (s || "")
     .split(",")
-    .map(x => x.trim())
+    .map((x) => x.trim())
     .filter(Boolean);
 }
 
@@ -111,14 +120,14 @@ export const ENV = {
   MQTT_TOPICS: parseList(value.MQTT_TOPICS),
   ADMIN_WHITELIST: parseList(value.ADMIN_WHITELIST),
   ACTION_WHITELIST: parseList(value.ACTION_WHITELIST),
-  
+
   // Base de Datos MySQL/MariaDB
   MYSQL_HOST: value.MYSQL_HOST,
   MYSQL_USER: value.MYSQL_USER,
   MYSQL_ROOT_PASSWORD: value.MYSQL_ROOT_PASSWORD,
   MYSQL_PASSWORD: value.MYSQL_PASSWORD,
   MYSQL_DATABASE: value.MYSQL_DATABASE,
-  
+
   // InfluxDB
   INFLUXDB_HOST: value.INFLUXDB_HOST,
   INFLUXDB_PORT: value.INFLUXDB_PORT,
@@ -127,33 +136,33 @@ export const ENV = {
   INFLUXDB_ADMIN_PASSWORD: value.INFLUXDB_ADMIN_PASSWORD,
   INFLUXDB_USER: value.INFLUXDB_USER,
   INFLUXDB_USER_PASSWORD: value.INFLUXDB_USER_PASSWORD,
-  
+
   // Grafana
   GRAFANA_ADMIN_USER: value.GRAFANA_ADMIN_USER,
   GRAFANA_ADMIN_PASSWORD: value.GRAFANA_ADMIN_PASSWORD,
-  
+
   // Configuración de Backup
   BACKUP_ENABLED: value.BACKUP_ENABLED,
   BACKUP_SCHEDULE: value.BACKUP_SCHEDULE,
   BACKUP_RETENTION_DAYS: value.BACKUP_RETENTION_DAYS,
   BACKUP_PATH: value.BACKUP_PATH,
-  
+
   // Configuración de Notificaciones
   SMTP_HOST: value.SMTP_HOST,
   SMTP_PORT: value.SMTP_PORT,
   SMTP_USER: value.SMTP_USER,
   SMTP_PASS: value.SMTP_PASS,
   WEBHOOK_URL: value.WEBHOOK_URL,
-  
+
   // Configuración de Monitoreo
   LOG_LEVEL: value.LOG_LEVEL,
   LOG_FILE: value.LOG_FILE,
   METRICS_ENABLED: value.METRICS_ENABLED,
   METRICS_PORT: value.METRICS_PORT,
-  
+
   // Configuración de Producción
   DOMAIN: value.DOMAIN,
   SSL_EMAIL: value.SSL_EMAIL,
   REVERSE_PROXY_HOST: value.REVERSE_PROXY_HOST,
-  REVERSE_PROXY_PORT: value.REVERSE_PROXY_PORT
+  REVERSE_PROXY_PORT: value.REVERSE_PROXY_PORT,
 };
