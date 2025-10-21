@@ -4,6 +4,8 @@
 // - Configuración avanzada (solo admin)
 // - Umbrales y triggers
 // ==========================
+import { mqttService } from "../service/mqtt.service.js";
+import { pool } from "../db/index.js";
 
 export async function getGeneralConfig(req, res) {
   try {
@@ -148,7 +150,6 @@ export async function updateAdvancedConfig(req, res) {
 export async function getMQTTStatus(req, res) {
   try {
     // URL externa para obtener estado MQTT desde el servicio
-    const mqttService = await import("../service/mqtt.service.js").then(m => m.mqttService);
     const connectionInfo = mqttService.getConnectionInfo();
     
     res.json({
@@ -175,8 +176,6 @@ export async function restartMQTTConnection(req, res) {
       });
     }
 
-    const mqttService = await import("../service/mqtt.service.js").then(m => m.mqttService);
-    
     // Reiniciar conexión
     mqttService.disconnect();
     setTimeout(() => {
@@ -207,8 +206,6 @@ export async function clearDataCache(req, res) {
       });
     }
 
-    const mqttService = await import("../service/mqtt.service.js").then(m => m.mqttService);
-    
     // Limpiar datos de temperatura almacenados
     mqttService.temperatureData = []; // Acceder directamente a la propiedad
     
@@ -238,8 +235,6 @@ export async function reloadMQTTTopics(req, res) {
       });
     }
 
-    const mqttService = await import("../service/mqtt.service.js").then(m => m.mqttService);
-    
     // Recargar tópicos desde la base de datos
     const result = await mqttService.reloadTopics();
     
@@ -264,10 +259,8 @@ export async function reloadMQTTTopics(req, res) {
 export async function getMQTTTopics(req, res) {
   try {
     // Todos los usuarios autenticados pueden ver los tópicos disponibles
-    const mqttService = await import("../service/mqtt.service.js").then(m => m.mqttService);
     
     // Obtener información detallada de los tópicos desde la base de datos
-    const { pool } = await import("../db/index.js");
     const conn = await pool.getConnection();
     
     const [topicsRows] = await conn.execute(`
@@ -348,7 +341,6 @@ export async function createMQTTTopic(req, res) {
       });
     }
 
-    const { pool } = await import("../db/index.js");
     const conn = await pool.getConnection();
     
     // Verificar que el tópico no exista
@@ -442,7 +434,6 @@ export async function updateMQTTTopic(req, res) {
       });
     }
 
-    const { pool } = await import("../db/index.js");
     const conn = await pool.getConnection();
     
     // Verificar que el tópico exista
@@ -562,7 +553,6 @@ export async function deleteMQTTTopic(req, res) {
       });
     }
 
-    const { pool } = await import("../db/index.js");
     const conn = await pool.getConnection();
     
     // Verificar que el tópico exista

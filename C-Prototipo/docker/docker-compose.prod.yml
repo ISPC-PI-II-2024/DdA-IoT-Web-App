@@ -43,6 +43,12 @@ services:
       # Listas blancas para roles
       - ADMIN_WHITELIST=${ADMIN_WHITELIST}
       - ACTION_WHITELIST=${ACTION_WHITELIST}
+      
+      # Base de Datos MySQL/MariaDB (configuración flexible para integración)
+      - MYSQL_HOST=${MYSQL_HOST:-mariadb}
+      - MYSQL_USER=${MYSQL_USER:-silo_user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-user@siloiot2015}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-silo_db}
     
     # Puertos (solo interno, no exponer directamente)
     expose:
@@ -215,6 +221,34 @@ volumes:
 #     networks:
 #       - iot-network
 #       - main-network
+#
+# 8.1. INICIALIZACIÓN DE BASE DE DATOS:
+#    Los scripts de inicialización están en ./mariadb/init/
+#    - 01-init.sql: Creación de tablas y estructura
+#    - 02-test-data.sql: Datos de prueba
+#    - init-database.sh: Script automatizado de inicialización
+#    - README-DATABASE.md: Documentación completa
+#    - database-config.py: Configuración por defecto
+#
+#    Para integrar con sistema existente:
+#    1. Copiar los scripts a la carpeta de init del sistema de BD
+#    2. Configurar las variables de entorno de conexión
+#    3. Los scripts se ejecutarán automáticamente al crear la BD
+#
+#    MÉTODOS DE INICIALIZACIÓN:
+#    A) Automática (recomendado):
+#       cp -r ./mariadb/init/* /path/to/existing/db/init/
+#
+#    B) Script automatizado:
+#       ./docker/init-database.sh
+#
+#    C) Manual con MySQL client:
+#       mysql -h localhost -u root -p < ./mariadb/init/01-init.sql
+#       mysql -h localhost -u root -p < ./mariadb/init/02-test-data.sql
+#
+#    D) Con Docker existente:
+#       docker exec -i mariadb-container mysql -u root -p < ./mariadb/init/01-init.sql
+#       docker exec -i mariadb-container mysql -u root -p < ./mariadb/init/02-test-data.sql
 #
 # 9. COMANDOS DE DESPLIEGUE:
 #    # Construir imágenes

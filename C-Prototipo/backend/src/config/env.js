@@ -7,7 +7,7 @@ import Joi from "joi";
 
 // Cargar primero .env de la raíz del proyecto y darle prioridad
 // Luego cargar (sin override) el .env local si existiera, pero sin pisar variables ya definidas
-const rootEnvPath = path.resolve(process.cwd(), "../.env");
+const rootEnvPath = path.resolve(process.cwd(), ".env");
 dotenv.config({ path: rootEnvPath, override: true });
 dotenv.config({ override: false });
 
