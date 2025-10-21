@@ -17,6 +17,7 @@ RUN addgroup -g 1001 -S nginx && \
 
 # Copiar archivos estáticos del frontend
 COPY frontend/public /usr/share/nginx/html
+COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Crear configuración personalizada de Nginx
 RUN cat > /etc/nginx/conf.d/default.conf << 'NGINX_EOF'
