@@ -52,7 +52,7 @@ services:
     
     # Puertos (solo interno, no exponer directamente)
     expose:
-      - "4000"
+      - "5000"
     
     # Health check
     healthcheck:
