@@ -15,7 +15,7 @@ const schema = Joi.object({
   NODE_ENV: Joi.string()
     .valid("development", "production", "test")
     .default("development"),
-  PORT: Joi.number().integer().default(4000),
+  PORT: Joi.number().integer().default(3000),
 
   // Seguridad JWT propia
   JWT_SECRET: Joi.string().min(24).required(),

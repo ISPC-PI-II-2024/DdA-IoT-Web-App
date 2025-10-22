@@ -33,16 +33,16 @@ RUN chown -R nodejs:nodejs /app
 # Cambiar a usuario no-root
 USER nodejs
 
-# Exponer puerto (por defecto 4000, configurable via ENV)
-EXPOSE 4000
+# Exponer puerto (configurable via ENV, por defecto 3000 para compatibilidad con docker-compose)
+EXPOSE 3000
 
 # Variables de entorno por defecto
 ENV NODE_ENV=production
-ENV PORT=4000
+ENV PORT=3000
 
 # Health check para verificar que el servicio esté funcionando
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:4000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+  CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
 # Comando para iniciar la aplicación
 CMD ["node", "src/server.js"]

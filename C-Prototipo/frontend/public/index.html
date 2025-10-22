@@ -6,9 +6,15 @@
        ========================== -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#111111" />
+  <meta name="theme-color" content="#0f1115" />
+  <meta name="description" content="Aplicación IoT para monitoreo de sensores de temperatura, CO2 y humedad" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="TST IoT" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" href="/icons/image.jpg" />
+  <link rel="icon" href="/icons/Proyecto-logo.jpg" />
+  <link rel="apple-touch-icon" href="/icons/Proyecto-logo.jpg" />
   <link rel="stylesheet" href="/style.css" />
   <title>ISPC Desarrollo Aplicaciones</title>
 
@@ -35,5 +41,10 @@
       navigator.serviceWorker.register("/sw.js").catch(console.error);
     }
   </script>
+  
+  <!-- ==========================
+       PWA INSTALLATION HANDLER
+       ========================== -->
+  <script type="module" src="/src/pwa-install.js"></script>
 </body>
 </html>

@@ -1,284 +1,224 @@
-# ==========================
-# Docker Compose para Producción
-# Configuración optimizada para servidor privado con subdominio
-# ==========================
-
-version: '3.8'
+version: '3.9'
 
 services:
-  # ==========================
-  # BACKEND - Node.js + Express + WebSocket + MQTT
-  # ==========================
-  backend:
-    build:
-      context: .
-      dockerfile: backend.Dockerfile
-    container_name: iot-backend-prod
+  # -----------------------------
+  # PORTAINER (Gestión de contenedores)
+  # -----------------------------
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
     restart: unless-stopped
-    
-    # Variables de entorno para producción
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./portainer/data:/data
+    networks:
+      - silo-network
+
+  # -----------------------------
+  # NGINX PROXY MANAGER
+  # -----------------------------
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"
     environment:
-      # Configuración básica
+      DB_SQLITE_FILE: "/data/database.sqlite"
+      DISABLE_IPV6: "false"
+    volumes:
+      - ./nginx-proxy-manager/data:/data
+      - ./nginx-proxy-manager/letsencrypt:/etc/letsencrypt
+    networks:
+      - silo-network
+    depends_on:
+      - portainer
+
+  # -----------------------------
+  # CLOUDFLARED TUNNEL
+  # -----------------------------
+#  cloudflared:
+#    image: cloudflare/cloudflared:latest
+#    container_name: cloudflared
+#    restart: unless-stopped
+#    command: tunnel --config /etc/cloudflared/config.yml run
+#    volumes:
+#      - ./cloudflared/config.yml:/etc/cloudflared/config.yml
+#    networks:
+#      - silo-network
+#    depends_on:
+#      - nginx-proxy-manager
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run  --token eyJhIjoiYzk3ZDU0ZjhiNzQyNWUwM2VkM2YzODk3YjlmNGJlODIiLCJ0IjoiZmVjMTIzNmQtYTJkOS00MTU5LTgzOWYtMDE5MDk2MjI5OTFk>    # environment:
+    #  - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - silo-network
+
+  # -----------------------------
+  # SILO SERVICES
+  # -----------------------------
+
+  # MariaDB
+  mariadb:
+    image: mariadb:latest
+    container_name: silo-mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ./services/silo/mariadb/data:/var/lib/mysql
+    networks:
+      - silo-network
+
+  # InfluxDB
+  influxdb:
+    image: influxdb:1.8
+    container_name: silo-influxdb
+    restart: unless-stopped
+    environment:
+      - INFLUXDB_DB=${INFLUXDB_DB}
+      - INFLUXDB_ADMIN_USER=${INFLUXDB_ADMIN_USER}
+      - INFLUXDB_ADMIN_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
+    volumes:
+      - ./services/silo/influxdb/data:/var/lib/influxdb
+    networks:
+      - silo-network
+
+  # Telegraf
+  telegraf:
+    image: telegraf:latest
+    container_name: silo-telegraf
+    restart: unless-stopped
+    volumes:
+      - ./services/silo/telegraf/config/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    networks:
+      - silo-network
+    depends_on:
+      - influxdb
+      - mosquitto
+
+  # Mosquitto MQTT
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: silo-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"  # MQTT
+      - "9001:9001"  # WebSocket
+    volumes:
+      - ./services/silo/mosquitto/config:/mosquitto/config
+      - ./services/silo/mosquitto/data:/mosquitto/data
+      - ./services/silo/mosquitto/log:/mosquitto/log
+    networks:
+      - silo-network
+
+  # Node-RED
+  nodered:
+    image: nodered/node-red:latest
+    container_name: silo-nodered
+    restart: unless-stopped
+    ports:
+      - "1880:1880"
+    volumes:
+      - ./services/silo/nodered/data:/data
+    environment:
+      - NODE_RED_ENABLE_PROJECTS=true
+    networks:
+      - silo-network
+    depends_on:
+      - mosquitto
+      - influxdb
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: silo-grafana
+    restart: unless-stopped
+    volumes:
+      - ./services/silo/grafana/data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    networks:
+      - silo-network
+    depends_on:
+      - influxdb
+
+  # Adminer
+  adminer:
+    image: adminer
+    container_name: silo-adminer
+    restart: unless-stopped
+    networks:
+      - silo-network
+    depends_on:
+      - mariadb
+      - influxdb
+
+  # App IoT - Backend
+  iot-backend:
+    build:
+      #context: https://github.com/ISPC-PI-II-2024/DdA-IoT-Web-App.git
+      context: ./services/iot-app/repo/C-Prototipo
+      #dockerfile: C-Prototipo/backend/Dockerfile
+      dockerfile: docker/backend.Dockerfile
+      args:
+        - NODE_ENV=production
+    container_name: iot-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"  # Solo para desarrollo, luego lo quitamos
+    environment:
       - NODE_ENV=production
-      - PORT=4000
-      
-      # JWT Configuration (CAMBIAR EN PRODUCCIÓN)
+      - PORT=3000
       - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=15m
-      - REFRESH_EXPIRES_IN=7d
-      
-      # Google Identity Services
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      
-      # CORS Configuration (DOMINIO ESPECÍFICO)
-      - CORS_ORIGIN=${CORS_ORIGIN}
-      
-      # MQTT Configuration
-      - MQTT_BROKER_HOST=${MQTT_BROKER_HOST}
-      - MQTT_BROKER_PORT=${MQTT_BROKER_PORT}
-      - MQTT_BROKER_USERNAME=${MQTT_BROKER_USERNAME}
-      - MQTT_BROKER_PASSWORD=${MQTT_BROKER_PASSWORD}
+      - MYSQL_HOST=silo-mariadb
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MQTT_BROKER_HOST=silo-mosquitto
+      - MQTT_BROKER_PORT=1883
       - MQTT_TOPICS=${MQTT_TOPICS}
-      
-      # Listas blancas para roles
       - ADMIN_WHITELIST=${ADMIN_WHITELIST}
       - ACTION_WHITELIST=${ACTION_WHITELIST}
-      
-      # Base de Datos MySQL/MariaDB (configuración flexible para integración)
-      - MYSQL_HOST=${MYSQL_HOST:-mariadb}
-      - MYSQL_USER=${MYSQL_USER:-silo_user}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-user@siloiot2015}
-      - MYSQL_DATABASE=${MYSQL_DATABASE:-silo_db}
-    
-    # Puertos (solo interno, no exponer directamente)
-    expose:
-      - "5000"
-    
-    # Health check
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    
-    # Red
     networks:
-      - iot-network
-    
-    # Logs con rotación
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "5"
-    
-    # Límites de recursos
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
-
-  # ==========================
-  # FRONTEND - Nginx + Archivos Estáticos
-  # ==========================
-  frontend:
-    build:
-      context: .
-      dockerfile: frontend.Dockerfile
-    container_name: iot-frontend-prod
-    restart: unless-stopped
-    
-    # Puertos (solo interno, usar reverse proxy)
-    expose:
-      - "80"
-    
-    # Health check
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    
-    # Dependencias
+      - silo-network
     depends_on:
-      backend:
-        condition: service_healthy
-    
-    # Red
+      - mariadb
+      - mosquitto
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # App IoT - Frontend
+  iot-frontend:
+    build:
+      context: ./services/iot-app/repo/C-Prototipo
+      dockerfile: docker/frontend.Dockerfile
+    container_name: iot-frontend
+    restart: unless-stopped
+    ports:
+      - "5000:80"
     networks:
-      - iot-network
-    
-    # Logs con rotación
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "5"
-    
-    # Límites de recursos
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.25'
-        reservations:
-          memory: 128M
-          cpus: '0.1'
+      - silo-network
+    depends_on:
+      - iot-backend
 
-
-# ==========================
-# REDES
-# ==========================
 networks:
-  iot-network:
+  silo-network:
     driver: bridge
-    name: iot-network
-
-
-# ==========================
-# VOLÚMENES
-# ==========================
-volumes:
-  # Para logs persistentes
-  backend-logs:
-    driver: local
-  frontend-logs:
-    driver: local
-
-# ==========================
-# CONFIGURACIÓN PARA PRODUCCIÓN
-# ==========================
-
-# INSTRUCCIONES PARA DESPLIEGUE EN PRODUCCIÓN:
-#
-# 1. CONFIGURACIÓN DEL SERVIDOR:
-#    - Instalar Docker y Docker Compose
-#    - Configurar firewall (solo puertos 80, 443, 22)
-#    - Configurar SSL/TLS con Let's Encrypt
-#
-# 2. CONFIGURACIÓN DEL DOMINIO:
-#    - Crear subdominio: iot.tudominio.com
-#    - Configurar DNS: iot.tudominio.com -> IP_DEL_SERVIDOR
-#    - Configurar reverse proxy (Nginx Proxy Manager, Traefik)
-#
-# 3. VARIABLES DE ENTORNO (.env):
-#    NODE_ENV=production
-#    JWT_SECRET=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6
-#    GOOGLE_CLIENT_ID=123456789-abcdefghijklmnop.apps.googleusercontent.com
-#    CORS_ORIGIN=https://iot.tudominio.com
-#    MQTT_BROKER_HOST=mqtt.tudominio.com
-#    MQTT_BROKER_PORT=8883
-#    MQTT_BROKER_USERNAME=mqtt_user
-#    MQTT_BROKER_PASSWORD=secure_mqtt_password
-#    ADMIN_WHITELIST=admin@tudominio.com,superadmin@tudominio.com
-#    ACTION_WHITELIST=operador@tudominio.com,tecnico@tudominio.com
-#
-# 4. CONFIGURACIÓN DEL REVERSE PROXY:
-#    - Configurar Nginx Proxy Manager o Traefik
-#    - Crear proxy host: iot.tudominio.com -> frontend:80
-#    - Configurar SSL con Let's Encrypt
-#    - Configurar WebSocket support
-#
-# 5. CONFIGURACIÓN DE MQTT:
-#    - Configurar broker MQTT externo
-#    - Configurar autenticación MQTT
-#    - Configurar SSL/TLS para MQTT
-#
-# 6. MONITOREO Y LOGS:
-#    - Configurar logs centralizados
-#    - Configurar métricas y alertas
-#    - Configurar backup automático
-#
-# 7. SEGURIDAD:
-#    - Usar secrets de Docker para datos sensibles
-#    - Configurar rate limiting
-#    - Configurar WAF (Web Application Firewall)
-#    - Configurar backup de datos
-#
-# 8. INTEGRACIÓN CON OTRO DOCKER COMPOSE:
-#    - Usar networks externas para comunicación
-#    - Configurar dependencias entre servicios
-#    - Compartir volúmenes si es necesario
-#
-# EJEMPLO DE INTEGRACIÓN:
-# networks:
-#   iot-network:
-#     external: true
-#     name: main-network
-#
-# services:
-#   backend:
-#     networks:
-#       - iot-network
-#       - main-network
-#   frontend:
-#     networks:
-#       - iot-network
-#       - main-network
-#
-# 8.1. INICIALIZACIÓN DE BASE DE DATOS:
-#    Los scripts de inicialización están en ./mariadb/init/
-#    - 01-init.sql: Creación de tablas y estructura
-#    - 02-test-data.sql: Datos de prueba
-#    - init-database.sh: Script automatizado de inicialización
-#    - README-DATABASE.md: Documentación completa
-#    - database-config.py: Configuración por defecto
-#
-#    Para integrar con sistema existente:
-#    1. Copiar los scripts a la carpeta de init del sistema de BD
-#    2. Configurar las variables de entorno de conexión
-#    3. Los scripts se ejecutarán automáticamente al crear la BD
-#
-#    MÉTODOS DE INICIALIZACIÓN:
-#    A) Automática (recomendado):
-#       cp -r ./mariadb/init/* /path/to/existing/db/init/
-#
-#    B) Script automatizado:
-#       ./docker/init-database.sh
-#
-#    C) Manual con MySQL client:
-#       mysql -h localhost -u root -p < ./mariadb/init/01-init.sql
-#       mysql -h localhost -u root -p < ./mariadb/init/02-test-data.sql
-#
-#    D) Con Docker existente:
-#       docker exec -i mariadb-container mysql -u root -p < ./mariadb/init/01-init.sql
-#       docker exec -i mariadb-container mysql -u root -p < ./mariadb/init/02-test-data.sql
-#
-# 9. COMANDOS DE DESPLIEGUE:
-#    # Construir imágenes
-#    docker-compose -f docker-compose.prod.yml build
-#
-#    # Levantar servicios
-#    docker-compose -f docker-compose.prod.yml up -d
-#
-#    # Ver logs
-#    docker-compose -f docker-compose.prod.yml logs -f
-#
-#    # Verificar estado
-#    docker-compose -f docker-compose.prod.yml ps
-#
-#    # Actualizar servicios
-#    docker-compose -f docker-compose.prod.yml pull
-#    docker-compose -f docker-compose.prod.yml up -d
-#
-#    # Detener servicios
-#    docker-compose -f docker-compose.prod.yml down
-#
-# 10. BACKUP Y RECUPERACIÓN:
-#     # Backup de configuración
-#     tar -czf backup-$(date +%Y%m%d).tar.gz .env docker-compose.prod.yml
-#
-#     # Backup de logs
-#     docker-compose -f docker-compose.prod.yml logs > logs-$(date +%Y%m%d).log
-#
-#     # Backup de volúmenes
-#     docker run --rm -v iot-backend-logs:/data -v $(pwd):/backup alpine tar czf /backup/backend-logs-$(date +%Y%m%d).tar.gz -C /data .
-#     docker run --rm -v iot-frontend-logs:/data -v $(pwd):/backup alpine tar czf /backup/frontend-logs-$(date +%Y%m%d).tar.gz -C /data .
-#
-# ==========================

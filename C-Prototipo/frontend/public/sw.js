@@ -3,8 +3,16 @@
 // - Precache de shell mínimo
 // - Runtime cache GET (network-first con fallback a cache)
 // ==========================
-const CACHE = "shell-v2";
-const ASSETS = ["/", "/index.html", "/style.css", "/manifest.webmanifest"];
+const CACHE = "shell-v3";
+const ASSETS = [
+  "/", 
+  "/index.html", 
+  "/style.css", 
+  "/manifest.webmanifest",
+  "/icons/Proyecto-logo.jpg",
+  "/src/app.js",
+  "/src/api.js"
+];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -16,6 +24,12 @@ self.addEventListener("activate", e => {
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
     )
   );
+});
+
+// Manejar eventos de instalación PWA
+self.addEventListener("beforeinstallprompt", e => {
+  console.log("PWA instalable detectada");
+  // El evento se manejará en el cliente
 });
 
 // network-first con fallback a cache, evitando cachear errores y /config.json

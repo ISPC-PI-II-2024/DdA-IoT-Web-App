@@ -17,13 +17,37 @@ RUN addgroup -g 1001 -S nginx && \
 
 # Copiar archivos estáticos del frontend
 COPY frontend/public /usr/share/nginx/html
-COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Crear configuración personalizada de Nginx
 RUN cat > /etc/nginx/conf.d/default.conf << 'NGINX_EOF'
 server {
     listen 80;
     server_name localhost;
+    
+    # Proxy para API del backend
+    location /api/ {
+        proxy_pass http://iot-backend:3000/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+    
+    # Proxy para WebSockets
+    location /ws/ {
+        proxy_pass http://iot-backend:3000/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
     
     # Configuración de seguridad
     add_header X-Frame-Options "SAMEORIGIN" always;
