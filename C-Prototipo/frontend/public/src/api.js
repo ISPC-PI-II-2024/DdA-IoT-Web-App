@@ -52,21 +52,52 @@ export async function initSession() {
   return false;
 }
 
+// Rate limiting simple
+const requestQueue = new Map(); // path -> { lastRequest, count }
+
 async function request(path, { method = "GET", body, auth = false } = {}) {
+  // Rate limiting - máximo 1 request por segundo por endpoint
+  const now = Date.now();
+  const queueKey = `${method}:${path}`;
+  const lastRequest = requestQueue.get(queueKey);
+  
+  if (lastRequest && now - lastRequest.lastRequest < 1000) {
+    lastRequest.count++;
+    if (lastRequest.count > 3) {
+      console.warn(`[RATE-LIMIT] demasiadas requests a ${path}`);
+      return Promise.reject(new Error("Rate limit exceeded"));
+    }
+  } else {
+    requestQueue.set(queueKey, { lastRequest: now, count: 1 });
+  }
+
   const headers = { "Content-Type": "application/json" };
   if (auth) {
     const t = getToken();
     if (t) headers["Authorization"] = `Bearer ${t}`;
   }
-  const res = await fetch(`${CFG().API_URL}${path}`, {
-    method,
-    headers,
-    credentials: "include",
-    body: body ? JSON.stringify(body) : undefined
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error("API error"), { status: res.status, data });
-  return data;
+  const url = `${CFG().API_URL}${path}`;
+  
+  try {
+    const res = await fetch(url, {
+      method,
+      headers,
+      credentials: "include",
+      body: body ? JSON.stringify(body) : undefined
+    });
+    
+    const data = await res.json().catch(() => ({}));
+    
+    if (!res.ok) {
+      console.error(`[API-ERROR] [${res.status}]:`, path, data);
+      throw Object.assign(new Error("API error"), { status: res.status, data });
+    }
+    
+    return data;
+  } catch (error) {
+    console.error(`[ERROR] Request failed to ${path}:`, error);
+    throw error;
+  }
 }
 
 // === Endpoints ===
@@ -140,5 +171,62 @@ export const DevicesAPI = {
   // Obtener datos de sensores de un dispositivo específico
   getDeviceSensorData(deviceId, limit = 100) {
     return request(`/devices/${deviceId}/sensor-data?limit=${limit}`, { auth: true });
+  },
+
+  // Obtener datos históricos de InfluxDB para un dispositivo
+  getHistoricalData(deviceId, limit = 100, timeRange = "24h") {
+    return request(`/devices/${deviceId}/historical?limit=${limit}&timeRange=${timeRange}`, { auth: true });
+  }
+};
+
+export const GatewayAPI = {
+  // Obtener todos los gateways
+  getAllGateways() {
+    return request("/gateways", { auth: true });
+  },
+  
+  // Obtener gateway específico con sus endpoints
+  getGatewayById(gatewayId) {
+    return request(`/gateways/${gatewayId}`, { auth: true });
+  },
+  
+  // Obtener todos los endpoints
+  getAllEndpoints() {
+    return request("/endpoints", { auth: true });
+  },
+  
+  // Obtener endpoint específico con sus sensores
+  getEndpointById(endpointId) {
+    return request(`/endpoints/${endpointId}`, { auth: true });
+  },
+  
+  // Obtener todos los sensores
+  getAllSensors() {
+    return request("/sensors", { auth: true });
+  },
+  
+  // Obtener sensor específico
+  getSensorById(sensorId) {
+    return request(`/sensors/${sensorId}`, { auth: true });
+  },
+  
+  // Obtener sensores por endpoint
+  getSensorsByEndpoint(endpointId) {
+    return request(`/endpoints/${endpointId}/sensors`, { auth: true });
+  },
+  
+  // Obtener estado completo del sistema
+  getSystemStatus() {
+    return request("/status", { auth: true });
+  },
+  
+  // Obtener umbrales actuales
+  getThresholds() {
+    return request("/thresholds", { auth: true });
+  },
+  
+  // Actualizar umbrales (solo admin)
+  updateThresholds(thresholds) {
+    return request("/thresholds", { method: "PUT", body: { thresholds }, auth: true });
   }
 };

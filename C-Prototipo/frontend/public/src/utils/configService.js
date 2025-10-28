@@ -115,11 +115,20 @@ class ConfigService {
   getAdvancedConfig() {
     return this.get(CONFIG_KEYS.ADVANCED, {
       thresholds: {
-        tempMinNormal: 18.0,
-        tempMaxNormal: 25.0,
-        tempAlertaCalor: 30.0,
-        tempAlertaFrio: 5.0,
-        enableTempAlerts: true
+        tempMin: 15.0,
+        tempMax: 30.0,
+        tempCriticalMin: 5.0,
+        tempCriticalMax: 40.0,
+        humidityMin: 30.0,
+        humidityMax: 80.0,
+        batteryLow: 20.0,
+        co2NormalMax: 1000,
+        co2Warning: 1500,
+        co2Critical: 2000,
+        enableTempAlerts: true,
+        enableHumidityAlerts: true,
+        enableBatteryAlerts: true,
+        enableCO2Alerts: true
       },
       charts: {
         updateInterval: 1000,

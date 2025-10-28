@@ -32,5 +32,31 @@
       "form_factor": "wide"
     }
   ],
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Acceso rápido al dashboard principal",
+      "url": "/#/dashboard",
+      "icons": [
+        {
+          "src": "/icons/Proyecto-logo.jpg",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Dispositivos",
+      "short_name": "Dispositivos",
+      "description": "Ver dispositivos IoT",
+      "url": "/#/dispositivos",
+      "icons": [
+        {
+          "src": "/icons/Proyecto-logo.jpg",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
 }

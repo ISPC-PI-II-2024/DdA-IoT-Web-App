@@ -5,18 +5,33 @@
        META / PWA / ESTILOS
        ========================== -->
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
   <meta name="theme-color" content="#0f1115" />
   <meta name="description" content="Aplicación IoT para monitoreo de sensores de temperatura, CO2 y humedad" />
+  <meta name="keywords" content="IoT, sensores, temperatura, humedad, CO2, monitoreo, ISPC" />
+  <meta name="author" content="ISPC 2025 - Desarrollo de Aplicaciones IoT" />
+  
+  <!-- PWA Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="TST IoT" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="msapplication-TileColor" content="#0f1115" />
+  <meta name="msapplication-config" content="/browserconfig.xml" />
+  
+  <!-- Open Graph Meta Tags -->
+  <meta property="og:title" content="ISPC TST IoT WebApp" />
+  <meta property="og:description" content="Aplicación IoT para monitoreo de sensores de temperatura, CO2 y humedad" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="/" />
+  <meta property="og:image" content="/icons/Proyecto-logo.jpg" />
+  
+  <!-- Links -->
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icons/Proyecto-logo.jpg" />
   <link rel="apple-touch-icon" href="/icons/Proyecto-logo.jpg" />
   <link rel="stylesheet" href="/style.css" />
-  <title>ISPC Desarrollo Aplicaciones</title>
+  <title>ISPC Desarrollo Aplicaciones IoT</title>
 
   <!-- ==========================
        CONFIG RUNTIME (inyectable por Docker más adelante)

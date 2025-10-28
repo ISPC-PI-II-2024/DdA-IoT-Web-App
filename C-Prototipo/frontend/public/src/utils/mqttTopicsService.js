@@ -15,6 +15,11 @@ class MQTTTopicsService {
     this.topicsByType = new Map();
     this.lastUpdate = null;
     this.listeners = new Set();
+    
+    // Asegurar que topics es siempre un array
+    if (!Array.isArray(this.topics)) {
+      this.topics = [];
+    }
   }
 
   /**
@@ -23,18 +28,29 @@ class MQTTTopicsService {
   async loadTopics() {
     try {
       const response = await ConfigAPI.getMQTTTopics();
-      if (response.success) {
-        this.topics = response.data.topics || [];
+      if (response && response.success && response.data) {
+        // El backend devuelve { success: true, data: { topics: [...] } }
+        const topicsData = response.data.topics || [];
+        
+        // Asegurar que topicsData es un array
+        this.topics = Array.isArray(topicsData) ? topicsData : [];
         this.topicsByType.clear();
         
-        // Organizar tópicos por tipo
-        this.topics.forEach(topic => {
-          const type = topic.tipo_datos || 'general';
-          if (!this.topicsByType.has(type)) {
-            this.topicsByType.set(type, []);
+        // Organizar tópicos por tipo solo si es array
+        if (Array.isArray(this.topics) && this.topics.length > 0) {
+          try {
+            this.topics.forEach(topic => {
+              const type = topic.tipo_datos || 'general';
+              if (!this.topicsByType.has(type)) {
+                this.topicsByType.set(type, []);
+              }
+              this.topicsByType.get(type).push(topic);
+            });
+          } catch (error) {
+            console.error("Error organizando tópicos por tipo:", error);
+            this.topicsByType.clear();
           }
-          this.topicsByType.get(type).push(topic);
-        });
+        }
         
         this.lastUpdate = Date.now();
         
@@ -54,13 +70,24 @@ class MQTTTopicsService {
       // Intentar cargar desde cache
       const cached = storage.get(CACHE_KEY);
       if (cached && (Date.now() - cached.lastUpdate) < CACHE_DURATION) {
-        this.topics = cached.topics || [];
-        this.topicsByType = new Map(cached.topicsByType || []);
+        const cachedTopics = cached.topics || [];
+        this.topics = Array.isArray(cachedTopics) ? cachedTopics : [];
+        
+        // Reconstruir Map desde cache
+        if (Array.isArray(cached.topicsByType)) {
+          this.topicsByType = new Map(cached.topicsByType);
+        } else {
+          this.topicsByType = new Map();
+        }
+        
         this.lastUpdate = cached.lastUpdate;
         return this.topics;
       }
     }
     
+    // Fallback: asegurar que siempre es array
+    this.topics = [];
+    this.topicsByType = new Map();
     return [];
   }
 

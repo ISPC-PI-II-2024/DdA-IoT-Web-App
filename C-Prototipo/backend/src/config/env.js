@@ -33,8 +33,8 @@ const schema = Joi.object({
   MQTT_BROKER_PORT: Joi.number().integer().default(1883),
   MQTT_BROKER_USERNAME: Joi.string().allow("").default(""),
   MQTT_BROKER_PASSWORD: Joi.string().allow("").default(""),
-  MQTT_TOPICS: Joi.string().default(
-    "vittoriodurigutti/prueba,vittoriodurigutti/temperature,vittoriodurigutti/c02,vittoriodurigutti/sensor/"
+  MQTT_TOPICS: Joi.string().allow("").default(
+    "gateway/gateway,gateway/endpoint,gateway/sensor"
   ),
 
   // Listas blancas para roles (en el env dentro de backend, coloquen su gmail personal)
@@ -87,6 +87,11 @@ const schema = Joi.object({
   SSL_EMAIL: Joi.string().email().default(""),
   REVERSE_PROXY_HOST: Joi.string().default("nginx-proxy-manager"),
   REVERSE_PROXY_PORT: Joi.number().integer().default(80),
+  
+  // Variables de desarrollo (opcionales)
+  DEV_MODE: Joi.string().valid("true", "false").default("false"),
+  DEV_USER_EMAIL: Joi.string().email().default("dev@example.com"),
+  DEV_USER_NAME: Joi.string().default("Developer"),
 }).unknown();
 
 const { value, error } = schema.validate(process.env, { abortEarly: false });
@@ -165,4 +170,9 @@ export const ENV = {
   SSL_EMAIL: value.SSL_EMAIL,
   REVERSE_PROXY_HOST: value.REVERSE_PROXY_HOST,
   REVERSE_PROXY_PORT: value.REVERSE_PROXY_PORT,
+  
+  // Variables de desarrollo
+  DEV_MODE: value.DEV_MODE,
+  DEV_USER_EMAIL: value.DEV_USER_EMAIL,
+  DEV_USER_NAME: value.DEV_USER_NAME,
 };

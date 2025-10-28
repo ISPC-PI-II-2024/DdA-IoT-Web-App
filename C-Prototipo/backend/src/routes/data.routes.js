@@ -5,7 +5,12 @@
 // IMPORTACIONES
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.middlewares.js";
-import dataControllers from "../controllers/data.controllers.js";
+import { 
+  getAllDevicesController, 
+  getDeviceByIdController, 
+  getDeviceSensorDataController,
+  getHistoricalDataController
+} from "../controllers/data.controllers.js";
 
 // --------------------------------------------------------------------
 // FUNCIONES
@@ -16,9 +21,12 @@ const router = Router();
 router.use(requireAuth);
 
 // Rutas de dispositivos
-router.get("/devices", dataControllers.getAllDevicesController);
-router.get("/devices/:deviceId", dataControllers.getDeviceByIdController);
-router.get("/devices/:deviceId/sensor-data", dataControllers.getDeviceSensorDataController);
+router.get("/devices", getAllDevicesController);
+router.get("/devices/:deviceId", getDeviceByIdController);
+router.get("/devices/:deviceId/sensor-data", getDeviceSensorDataController);
+
+// Ruta para datos históricos desde InfluxDB
+router.get("/devices/:deviceId/historical", getHistoricalDataController);
 
 // EXPORTACION
 export default router;

@@ -7,13 +7,19 @@
 import { el } from "../utils/dom.js";
 import { rtClient } from "../ws.js";
 import { mqttTopicsService } from "../utils/mqttTopicsService.js";
+import { configService } from "../utils/configService.js";
 
 export async function chartWidget({ 
   title = "Tiempo real", 
   topic = "metrics/demo", 
-  maxPoints = 120,
+  maxPoints = null,
   topicType = null // Tipo específico de tópico a usar
 } = {}) {
+  // Leer configuración de visualización
+  const config = configService.getVisualizationConfig();
+  
+  // Usar configuración o valor por defecto
+  const finalMaxPoints = maxPoints || config.chartPoints || 120;
   const root = el("div", { class: "card" },
     el("h3", {}, title),
     el("canvas", { width: 900, height: 240, style: "max-width:100%;height:auto;border:1px solid #242b36;border-radius:8px" })
@@ -25,7 +31,7 @@ export async function chartWidget({
   let dirty = false;
 
   function pushPoint(v) {
-    if (data.length >= maxPoints) data.shift();
+    if (data.length >= finalMaxPoints) data.shift();
     data.push(v);
     dirty = true;
   }
@@ -59,7 +65,7 @@ export async function chartWidget({
     ctx.strokeStyle = "#46a0ff";
     ctx.beginPath();
     data.forEach((v, i) => {
-      const x = (i / (maxPoints - 1)) * (W - 20) + 10;
+      const x = (i / (finalMaxPoints - 1)) * (W - 20) + 10;
       const y = H - 20 - ((v - ymin) / (ymax - ymin)) * (H - 40);
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
@@ -90,7 +96,7 @@ export async function chartWidget({
         const topicsByType = mqttTopicsService.getTopicsByType(topicType);
         if (topicsByType.length > 0) {
           currentTopic = topicsByType[0].nombre;
-          console.log(`📡 Usando tópico de tipo '${topicType}': ${currentTopic}`);
+          console.log(`[WS] Usando topico de tipo '${topicType}': ${currentTopic}`);
         }
       }
       

@@ -32,46 +32,46 @@ export async function render() {
     el("h3", {}, "Umbrales de Temperatura"),
     el("div", { class: "form-section" },
       el("div", { class: "form-group" },
-        el("label", { for: "temp_min_normal" }, "Temperatura Mínima Normal (°C):"),
+        el("label", { for: "temp_min" }, "Temperatura Mínima Normal (°C):"),
         el("input", { 
           type: "number", 
-          id: "temp_min_normal", 
-          name: "temp_min_normal", 
+          id: "temp_min", 
+          name: "temp_min", 
           step: "0.1",
-          placeholder: "18.0"
+          placeholder: "15.0"
         })
       ),
       
       el("div", { class: "form-group" },
-        el("label", { for: "temp_max_normal" }, "Temperatura Máxima Normal (°C):"),
+        el("label", { for: "temp_max" }, "Temperatura Máxima Normal (°C):"),
         el("input", { 
           type: "number", 
-          id: "temp_max_normal", 
-          name: "temp_max_normal", 
-          step: "0.1",
-          placeholder: "25.0"
-        })
-      ),
-      
-      el("div", { class: "form-group" },
-        el("label", { for: "temp_alerta_calor" }, "Umbral Alert Alarm (Calor) (°C):"),
-        el("input", { 
-          type: "number", 
-          id: "temp_alerta_calor", 
-          name: "temp_alerta_calor", 
+          id: "temp_max", 
+          name: "temp_max", 
           step: "0.1",
           placeholder: "30.0"
         })
       ),
       
       el("div", { class: "form-group" },
-        el("label", { for: "temp_alerta_frio" }, "Umbral Alert Alarm (Frío) (°C):"),
+        el("label", { for: "temp_critical_min" }, "Temperatura Crítica Mínima (°C):"),
         el("input", { 
           type: "number", 
-          id: "temp_alerta_frio", 
-          name: "temp_alerta_frio", 
+          id: "temp_critical_min", 
+          name: "temp_critical_min", 
           step: "0.1",
           placeholder: "5.0"
+        })
+      ),
+      
+      el("div", { class: "form-group" },
+        el("label", { for: "temp_critical_max" }, "Temperatura Crítica Máxima (°C):"),
+        el("input", { 
+          type: "number", 
+          id: "temp_critical_max", 
+          name: "temp_critical_max", 
+          step: "0.1",
+          placeholder: "40.0"
         })
       ),
       
@@ -83,6 +83,132 @@ export async function render() {
             name: "enable_temp_alerts"
           }),
           " Habilitar alertas de temperatura"
+        )
+      )
+    )
+  );
+
+  // Configuración de umbrales para humedad
+  const umbralesHumedad = el("div", { class: "card" },
+    el("h3", {}, "Umbrales de Humedad"),
+    el("div", { class: "form-section" },
+      el("div", { class: "form-group" },
+        el("label", { for: "humidity_min" }, "Humedad Mínima (%):"),
+        el("input", { 
+          type: "number", 
+          id: "humidity_min", 
+          name: "humidity_min", 
+          step: "0.1",
+          min: "0",
+          max: "100",
+          placeholder: "30.0"
+        })
+      ),
+      
+      el("div", { class: "form-group" },
+        el("label", { for: "humidity_max" }, "Humedad Máxima (%):"),
+        el("input", { 
+          type: "number", 
+          id: "humidity_max", 
+          name: "humidity_max", 
+          step: "0.1",
+          min: "0",
+          max: "100",
+          placeholder: "80.0"
+        })
+      ),
+      
+      el("div", { class: "form-group" },
+        el("label", { class: "checkbox-label" },
+          el("input", { 
+            type: "checkbox", 
+            id: "enable_humidity_alerts",
+            name: "enable_humidity_alerts"
+          }),
+          " Habilitar alertas de humedad"
+        )
+      )
+    )
+  );
+
+  // Configuración de umbrales para batería
+  const umbralesBateria = el("div", { class: "card" },
+    el("h3", {}, "Umbrales de Batería"),
+    el("div", { class: "form-section" },
+      el("div", { class: "form-group" },
+        el("label", { for: "battery_low" }, "Umbral de Batería Baja (%):"),
+        el("input", { 
+          type: "number", 
+          id: "battery_low", 
+          name: "battery_low", 
+          step: "1",
+          min: "0",
+          max: "100",
+          placeholder: "20"
+        })
+      ),
+      
+      el("div", { class: "form-group" },
+        el("label", { class: "checkbox-label" },
+          el("input", { 
+            type: "checkbox", 
+            id: "enable_battery_alerts",
+            name: "enable_battery_alerts"
+          }),
+          " Habilitar alertas de batería"
+        )
+      )
+    )
+  );
+
+  // Configuración de umbrales para CO2
+  const umbralesCO2 = el("div", { class: "card" },
+    el("h3", {}, "Umbrales de CO₂"),
+    el("div", { class: "form-section" },
+      el("div", { class: "form-group" },
+        el("label", { for: "co2_normal_max" }, "Nivel Normal Máximo (ppm):"),
+        el("input", { 
+          type: "number", 
+          id: "co2_normal_max", 
+          name: "co2_normal_max", 
+          step: "1",
+          min: "0",
+          placeholder: "1000"
+        })
+      ),
+      
+      el("div", { class: "form-group" },
+        el("label", { for: "co2_warning" }, "Umbral de Advertencia (ppm):"),
+        el("input", { 
+          type: "number", 
+          id: "co2_warning", 
+          name: "co2_warning", 
+          step: "1",
+          min: "0",
+          placeholder: "1500"
+        })
+      ),
+      
+      el("div", { class: "form-group" },
+        el("label", { for: "co2_critical" }, "Nivel Crítico (ppm):"),
+        el("input", { 
+          type: "number", 
+          id: "co2_critical", 
+          name: "co2_critical", 
+          step: "1",
+          min: "0",
+          placeholder: "2000"
+        })
+      ),
+      
+      el("div", { class: "form-group" },
+        el("label", { class: "checkbox-label" },
+          el("input", { 
+            type: "checkbox", 
+            id: "enable_co2_alerts",
+            name: "enable_co2_alerts"
+          }),
+          " Habilitar alertas de CO₂"
         )
       )
     )
@@ -290,11 +416,25 @@ export async function render() {
   window.saveAdvancedConfig = async function() {
     const config = {
       thresholds: {
-        tempMinNormal: parseFloat(document.getElementById("temp_min_normal").value) || 18.0,
-        tempMaxNormal: parseFloat(document.getElementById("temp_max_normal").value) || 25.0,
-        tempAlertaCalor: parseFloat(document.getElementById("temp_alerta_calor").value) || 30.0,
-        tempAlertaFrio: parseFloat(document.getElementById("temp_alerta_frio").value) || 5.0,
-        enableTempAlerts: document.getElementById("enable_temp_alerts").checked
+        // Umbrales de temperatura
+        tempMin: parseFloat(document.getElementById("temp_min").value) || 15.0,
+        tempMax: parseFloat(document.getElementById("temp_max").value) || 30.0,
+        tempCriticalMin: parseFloat(document.getElementById("temp_critical_min").value) || 5.0,
+        tempCriticalMax: parseFloat(document.getElementById("temp_critical_max").value) || 40.0,
+        // Umbrales de humedad
+        humidityMin: parseFloat(document.getElementById("humidity_min").value) || 30.0,
+        humidityMax: parseFloat(document.getElementById("humidity_max").value) || 80.0,
+        // Umbral de batería
+        batteryLow: parseFloat(document.getElementById("battery_low").value) || 20.0,
+        // Umbrales de CO2
+        co2NormalMax: parseFloat(document.getElementById("co2_normal_max").value) || 1000,
+        co2Warning: parseFloat(document.getElementById("co2_warning").value) || 1500,
+        co2Critical: parseFloat(document.getElementById("co2_critical").value) || 2000,
+        // Configuración de alertas
+        enableTempAlerts: document.getElementById("enable_temp_alerts").checked,
+        enableHumidityAlerts: document.getElementById("enable_humidity_alerts").checked,
+        enableBatteryAlerts: document.getElementById("enable_battery_alerts").checked,
+        enableCO2Alerts: document.getElementById("enable_co2_alerts").checked
       },
       charts: {
         updateInterval: parseInt(document.getElementById("chart_update_interval").value) || 1000,
@@ -317,6 +457,19 @@ export async function render() {
     try {
       // Guardar usando ConfigService (que sincroniza local y remoto)
       const success = await configService.setAdvancesConfig(config);
+      
+      // También actualizar umbrales en el servidor MQTT
+      try {
+        const { GatewayAPI } = await import("../api.js");
+        if (GatewayAPI && GatewayAPI.updateThresholds) {
+          await GatewayAPI.updateThresholds(config.thresholds);
+          console.log("Umbrales actualizados en el servidor MQTT");
+        } else {
+          console.warn("GatewayAPI no disponible o método updateThresholds no encontrado");
+        }
+      } catch (mqttError) {
+        console.warn("No se pudieron actualizar umbrales en MQTT:", mqttError);
+      }
       
       if (success) {
         alert("Configuración avanzada guardada exitosamente");
@@ -427,11 +580,27 @@ export async function render() {
       
       // Cargar umbrales
       if (config.thresholds) {
-        document.getElementById("temp_min_normal").value = config.thresholds.tempMinNormal || "";
-        document.getElementById("temp_max_normal").value = config.thresholds.tempMaxNormal || "";
-        document.getElementById("temp_alerta_calor").value = config.thresholds.tempAlertaCalor || "";
-        document.getElementById("temp_alerta_frio").value = config.thresholds.tempAlertaFrio || "";
+        // Umbrales de temperatura
+        document.getElementById("temp_min").value = config.thresholds.tempMin || "";
+        document.getElementById("temp_max").value = config.thresholds.tempMax || "";
+        document.getElementById("temp_critical_min").value = config.thresholds.tempCriticalMin || "";
+        document.getElementById("temp_critical_max").value = config.thresholds.tempCriticalMax || "";
         document.getElementById("enable_temp_alerts").checked = config.thresholds.enableTempAlerts || false;
+        
+        // Umbrales de humedad
+        document.getElementById("humidity_min").value = config.thresholds.humidityMin || "";
+        document.getElementById("humidity_max").value = config.thresholds.humidityMax || "";
+        document.getElementById("enable_humidity_alerts").checked = config.thresholds.enableHumidityAlerts || false;
+        
+        // Umbrales de batería
+        document.getElementById("battery_low").value = config.thresholds.batteryLow || "";
+        document.getElementById("enable_battery_alerts").checked = config.thresholds.enableBatteryAlerts || false;
+        
+        // Umbrales de CO2
+        document.getElementById("co2_normal_max").value = config.thresholds.co2NormalMax || "";
+        document.getElementById("co2_warning").value = config.thresholds.co2Warning || "";
+        document.getElementById("co2_critical").value = config.thresholds.co2Critical || "";
+        document.getElementById("enable_co2_alerts").checked = config.thresholds.enableCO2Alerts || false;
       }
       
       // Cargar configuración de gráficos
@@ -641,7 +810,7 @@ export async function render() {
     ),
     
     el("div", { class: "grid cols-2" },
-      el("div", {}, umbralesTemperatura, triggersGraficos),
+      el("div", {}, umbralesTemperatura, umbralesHumedad, umbralesBateria, umbralesCO2, triggersGraficos),
       el("div", {}, configMQTT, notificacionesAvanzadas)
     ),
     

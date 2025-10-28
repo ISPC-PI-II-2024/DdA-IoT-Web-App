@@ -36,7 +36,15 @@ async function initGoogle(container) {
       try {
         const data = await AuthAPI.googleLogin(resp.credential);
         setSession(data); // guarda token + user + role y setState()
-        location.hash = "#/dashboard";
+        
+        // Esperar un momento para que el estado se actualice completamente
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Redirigir explícitamente sin recargar
+        window.location.hash = "#/dashboard";
+        
+        // Trigger hashchange para asegurar que se detecte
+        window.dispatchEvent(new HashChangeEvent("hashchange"));
       } catch (e) {
         console.error(e);
         alert("No se pudo iniciar sesión con Google.");

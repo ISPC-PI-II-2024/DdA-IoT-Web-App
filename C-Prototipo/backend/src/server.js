@@ -18,6 +18,7 @@ import temperatureRoutes from "./routes/temperature.routes.js";
 import { initWebSocket } from "./sw/index.js";
 import { mqttService } from "./service/mqtt.service.js";
 import CO2Routes from "./routes/CO2.routes.js";
+import gatewayRoutes from "./routes/gateway.routes.js";
 
 const app = express();
 
@@ -33,16 +34,17 @@ app.use(
   })
 );
 
-// Salud
-app.get("/health", (req, res) => res.json({ ok: true }));
-
 // API
 app.use("/api/auth", authRoutes);
 app.use("/api", configRoutes);
+
+// Salud - DEBE ir DESPUÉS de las rutas para evitar conflictos
+app.get("/health", (req, res) => res.json({ ok: true }));
 app.use("/api/config", configSystemRoutes);
 app.use("/api", temperatureRoutes);
 app.use("/api", dataRoutes);
 app.use("/api", CO2Routes);
+app.use("/api", gatewayRoutes);
 
 // HTTP server + WS
 const server = createServer(app);
@@ -61,5 +63,6 @@ server.listen(ENV.PORT, () => {
   console.log(
     `📡 MQTT broker: ${ENV.MQTT_BROKER_HOST}:${ENV.MQTT_BROKER_PORT}`
   );
-  console.log(`📡 MQTT topics: ${ENV.MQTT_TOPICS.join(", ")}`);
+  // ENV.MQTT_TOPICS ya es un array procesado en env.js
+  console.log(`📡 MQTT topics: ${Array.isArray(ENV.MQTT_TOPICS) ? ENV.MQTT_TOPICS.join(", ") : 'N/A'}`);
 });

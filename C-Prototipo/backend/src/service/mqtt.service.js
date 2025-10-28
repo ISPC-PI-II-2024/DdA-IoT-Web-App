@@ -6,6 +6,7 @@
 import mqtt from "mqtt";
 import { ENV } from "../config/env.js";
 import { pool } from "../db/index.js";
+import { syncGatewayToDB, syncEndpointToDB, syncSensorToDB } from "./data.service.js";
 
 class MQTTService {
   constructor() {
@@ -19,6 +20,20 @@ class MQTTService {
     this.topics = []; // Tópicos obtenidos desde DB
     this.topicsFromDB = false; // Flag para saber si se obtuvieron desde DB
     this.co2Data = [];
+    
+    // Nuevos datos para gateway
+    this.gatewayData = new Map(); // gateway_id -> datos del gateway
+    this.endpointData = new Map(); // endpoint_id -> datos del endpoint
+    this.sensorData = new Map(); // sensor_id -> datos del sensor
+    this.thresholds = {
+      tempMin: 15,
+      tempMax: 30,
+      tempCriticalMin: 5,
+      tempCriticalMax: 40,
+      humidityMin: 30,
+      humidityMax: 80,
+      batteryLow: 20
+    };
   }
 
   /**
@@ -30,7 +45,7 @@ class MQTTService {
       const conn = await pool.getConnection();
 
       // Intentar obtener tópicos desde la tabla mqtt_topics
-      const [topicsRows] = await conn.execute(`
+      const topicsRows = await conn.execute(`
         SELECT nombre, qos_level, tipo_datos, metadatos 
         FROM mqtt_topics 
         WHERE activo = TRUE 
@@ -39,7 +54,7 @@ class MQTTService {
 
       conn.release();
 
-      if (topicsRows.length > 0) {
+      if (topicsRows && topicsRows.length > 0) {
         this.topics = topicsRows.map((row) => row.nombre);
         this.topicsFromDB = true;
         console.log(
@@ -58,13 +73,13 @@ class MQTTService {
 
       // Si no hay tópicos en la tabla específica, intentar desde configuraciones_sistema
       const conn2 = await pool.getConnection();
-      const [configRows] = await conn2.execute(`
+      const configRows = await conn2.execute(`
         SELECT valor FROM configuraciones_sistema 
         WHERE clave = 'mqtt_topics_default' AND valor IS NOT NULL
       `);
       conn2.release();
 
-      if (configRows.length > 0 && configRows[0].valor) {
+      if (configRows && configRows.length > 0 && configRows[0].valor) {
         this.topics = configRows[0].valor
           .split(",")
           .map((t) => t.trim())
@@ -80,7 +95,9 @@ class MQTTService {
     }
 
     // Fallback a variables de entorno
-    this.topics = [...ENV.MQTT_TOPICS];
+    // Asegurar que MQTT_TOPICS es un array
+    const envTopics = Array.isArray(ENV.MQTT_TOPICS) ? ENV.MQTT_TOPICS : [];
+    this.topics = envTopics.length > 0 ? envTopics : ['gateway/gateway', 'gateway/endpoint', 'gateway/sensor'];
     this.topicsFromDB = false;
     console.log(
       `⚠️ Usando tópicos de ENV como fallback: ${this.topics.length} tópicos`
@@ -210,34 +227,43 @@ class MQTTService {
 
       console.log(`📨 MQTT [${topic}]:`, data);
 
-      // Procesar datos de temperatura
-      if (this.isTemperatureData(data)) {
-        const temperaturePoint = {
-          timestamp,
-          topic,
-          temperature: parseFloat(data.temperature || data.temp || data.value),
-          humidity: data.humidity ? parseFloat(data.humidity) : null,
-          sensor_id: data.sensor_id || data.id || "unknown",
-          raw_data: data,
-        };
+      // Broadcasting para logs (todos los mensajes MQTT)
+      this.broadcastLogMessage(topic, data, timestamp);
 
-        this.addTemperatureData(temperaturePoint);
-        this.broadcastToSubscribers(temperaturePoint);
-
-        if (this.isCO2Data(data) || topic.toLowerCase().includes("co2")) {
-          const co2Point = {
+      // Procesar datos según el tópico
+      if (topic.startsWith('gateway/gateway')) {
+        this.handleGatewayData(data, timestamp);
+      } else if (topic.startsWith('gateway/endpoint')) {
+        this.handleEndpointData(data, timestamp);
+      } else if (topic.startsWith('gateway/sensor')) {
+        this.handleSensorData(data, timestamp);
+      } else {
+        // Mantener compatibilidad con formato anterior
+        if (this.isTemperatureData(data)) {
+          const temperaturePoint = {
             timestamp,
             topic,
-            co2: parseFloat(data.co2 || data.CO2 || data.value),
+            temperature: parseFloat(data.temperature || data.temp || data.value),
+            humidity: data.humidity ? parseFloat(data.humidity) : null,
             sensor_id: data.sensor_id || data.id || "unknown",
             raw_data: data,
           };
 
-          this.addCO2Data(co2Point);
-          this.broadcastCO2ToSubscribers(co2Point);
-        } else {
-          // Log de otros tipos de datos para debugging
-          console.log(`📊 Datos no-temperatura recibidos en ${topic}:`, data);
+          this.addTemperatureData(temperaturePoint);
+          this.broadcastToSubscribers(temperaturePoint);
+
+          if (this.isCO2Data(data) || topic.toLowerCase().includes("co2")) {
+            const co2Point = {
+              timestamp,
+              topic,
+              co2: parseFloat(data.co2 || data.CO2 || data.value),
+              sensor_id: data.sensor_id || data.id || "unknown",
+              raw_data: data,
+            };
+
+            this.addCO2Data(co2Point);
+            this.broadcastCO2ToSubscribers(co2Point);
+          }
         }
       }
     } catch (error) {
@@ -245,6 +271,9 @@ class MQTTService {
       // Intentar como texto plano
       const textMessage = message.toString();
       console.log(`📨 MQTT [${topic}] (texto):`, textMessage);
+
+      // Broadcasting para logs (mensaje de error)
+      this.broadcastLogMessage(topic, { error: textMessage, source: "text" }, new Date().toISOString());
 
       // Intentar parsear como número simple
       const numericValue = parseFloat(textMessage);
@@ -287,9 +316,9 @@ class MQTTService {
 
   broadcastToSubscribers(data) {
     const message = JSON.stringify({
-      type: "temperature_update",
-      data: data,
-      timestamp: data.timestamp,
+      topic: "temperature",
+      ts: Date.now(),
+      payload: data,
     });
 
     this.subscribers.forEach((subscriber) => {
@@ -450,6 +479,303 @@ class MQTTService {
       max: Math.round(max * 100) / 100,
       latest: this.getLatestCO2(),
     };
+  }
+
+  // ==========================
+  // Nuevos métodos para manejar datos de gateway
+  // ==========================
+
+  handleGatewayData(data, timestamp) {
+    const gatewayId = data.id_gateway;
+    const gatewayInfo = {
+      id: gatewayId,
+      wifi_signal: data.wifi_signal,
+      lora_status: data.lora_status,
+      uptime: data.uptime,
+      timestamp,
+      raw_data: data
+    };
+
+    this.gatewayData.set(gatewayId, gatewayInfo);
+    this.broadcastGatewayUpdate(gatewayInfo);
+    
+    // Sincronizar con base de datos
+    syncGatewayToDB(gatewayInfo).catch(error => {
+      console.error('Error sincronizando gateway a DB:', error);
+    });
+    
+    console.log(`📡 Gateway ${gatewayId} actualizado:`, gatewayInfo);
+  }
+
+  handleEndpointData(data, timestamp) {
+    const gatewayId = data.id_gateway;
+    
+    if (data.endpoints && Array.isArray(data.endpoints)) {
+      data.endpoints.forEach(endpoint => {
+        const endpointId = endpoint.id;
+        const endpointInfo = {
+          id: endpointId,
+          gateway_id: gatewayId,
+          bateria: endpoint.bateria,
+          cargando: endpoint.cargando,
+          lora: endpoint.lora,
+          sensores: endpoint.sensores,
+          timestamp,
+          raw_data: endpoint,
+          status: this.getEndpointStatus(endpoint)
+        };
+
+        this.endpointData.set(endpointId, endpointInfo);
+        this.broadcastEndpointUpdate(endpointInfo);
+        
+        // Sincronizar con base de datos
+        syncEndpointToDB(endpointInfo).catch(error => {
+          console.error('Error sincronizando endpoint a DB:', error);
+        });
+        
+        console.log(`📡 Endpoint ${endpointId} actualizado:`, endpointInfo);
+      });
+    }
+  }
+
+  handleSensorData(data, timestamp) {
+    const gatewayId = data.id_gateway;
+    
+    if (data.endpoints && Array.isArray(data.endpoints)) {
+      data.endpoints.forEach(endpoint => {
+        const endpointId = endpoint.id_endpoint;
+        
+        if (endpoint.sensores && Array.isArray(endpoint.sensores)) {
+          endpoint.sensores.forEach(sensor => {
+            const sensorId = sensor.id;
+            const sensorInfo = {
+              id: sensorId,
+              gateway_id: gatewayId,
+              endpoint_id: endpointId,
+              posicion: sensor.posicion,
+              temperatura: sensor.temp,
+              humedad: sensor.humedad,
+              estado: sensor.estado,
+              timestamp,
+              raw_data: sensor,
+              status: this.getSensorStatus(sensor),
+              alerts: this.checkSensorAlerts(sensor)
+            };
+
+            this.sensorData.set(sensorId, sensorInfo);
+            this.broadcastSensorUpdate(sensorInfo);
+            
+            // Sincronizar con base de datos
+            syncSensorToDB(sensorInfo).catch(error => {
+              console.error('Error sincronizando sensor a DB:', error);
+            });
+            
+            // También agregar a datos de temperatura para compatibilidad
+            const temperaturePoint = {
+              timestamp,
+              topic: `gateway/sensor`,
+              temperature: sensor.temp,
+              humidity: sensor.humedad,
+              sensor_id: sensorId,
+              gateway_id: gatewayId,
+              endpoint_id: endpointId,
+              raw_data: sensor,
+            };
+
+            this.addTemperatureData(temperaturePoint);
+            this.broadcastToSubscribers(temperaturePoint);
+            
+            console.log(`📡 Sensor ${sensorId} actualizado:`, sensorInfo);
+          });
+        }
+      });
+    }
+  }
+
+  getEndpointStatus(endpoint) {
+    if (endpoint.bateria < this.thresholds.batteryLow) return 'battery_low';
+    if (endpoint.lora !== 'ok') return 'lora_error';
+    return 'ok';
+  }
+
+  getSensorStatus(sensor) {
+    if (sensor.estado !== 'ok') return sensor.estado;
+    
+    if (sensor.temp < this.thresholds.tempCriticalMin || 
+        sensor.temp > this.thresholds.tempCriticalMax) {
+      return 'critical';
+    }
+    
+    if (sensor.temp < this.thresholds.tempMin || 
+        sensor.temp > this.thresholds.tempMax) {
+      return 'warning';
+    }
+    
+    return 'ok';
+  }
+
+  checkSensorAlerts(sensor) {
+    const alerts = [];
+    
+    if (sensor.temp < this.thresholds.tempCriticalMin) {
+      alerts.push({ type: 'temp_critical_low', value: sensor.temp, threshold: this.thresholds.tempCriticalMin });
+    } else if (sensor.temp > this.thresholds.tempCriticalMax) {
+      alerts.push({ type: 'temp_critical_high', value: sensor.temp, threshold: this.thresholds.tempCriticalMax });
+    } else if (sensor.temp < this.thresholds.tempMin) {
+      alerts.push({ type: 'temp_low', value: sensor.temp, threshold: this.thresholds.tempMin });
+    } else if (sensor.temp > this.thresholds.tempMax) {
+      alerts.push({ type: 'temp_high', value: sensor.temp, threshold: this.thresholds.tempMax });
+    }
+    
+    if (sensor.humedad < this.thresholds.humidityMin) {
+      alerts.push({ type: 'humidity_low', value: sensor.humedad, threshold: this.thresholds.humidityMin });
+    } else if (sensor.humedad > this.thresholds.humidityMax) {
+      alerts.push({ type: 'humidity_high', value: sensor.humedad, threshold: this.thresholds.humidityMax });
+    }
+    
+    return alerts;
+  }
+
+  broadcastGatewayUpdate(data) {
+    const message = JSON.stringify({
+      topic: "gateway_update",
+      ts: Date.now(),
+      payload: data,
+    });
+
+    this.subscribers.forEach((subscriber) => {
+      try {
+        if (subscriber.readyState === 1) {
+          subscriber.send(message);
+        } else {
+          this.subscribers.delete(subscriber);
+        }
+      } catch (error) {
+        console.error("❌ Error enviando gateway update:", error);
+        this.subscribers.delete(subscriber);
+      }
+    });
+  }
+
+  broadcastEndpointUpdate(data) {
+    const message = JSON.stringify({
+      topic: "endpoint_update",
+      ts: Date.now(),
+      payload: data,
+    });
+
+    this.subscribers.forEach((subscriber) => {
+      try {
+        if (subscriber.readyState === 1) {
+          subscriber.send(message);
+        } else {
+          this.subscribers.delete(subscriber);
+        }
+      } catch (error) {
+        console.error("❌ Error enviando endpoint update:", error);
+        this.subscribers.delete(subscriber);
+      }
+    });
+  }
+
+  broadcastSensorUpdate(data) {
+    const message = JSON.stringify({
+      topic: "sensor_update",
+      ts: Date.now(),
+      payload: data,
+    });
+
+    this.subscribers.forEach((subscriber) => {
+      try {
+        if (subscriber.readyState === 1) {
+          subscriber.send(message);
+        } else {
+          this.subscribers.delete(subscriber);
+        }
+      } catch (error) {
+        console.error("❌ Error enviando sensor update:", error);
+        this.subscribers.delete(subscriber);
+      }
+    });
+  }
+
+  // Broadcasting específico para logs MQTT
+  broadcastLogMessage(topic, data, timestamp) {
+    const logMessage = JSON.stringify({
+      topic: "mqtt_log",
+      ts: Date.now(),
+      payload: {
+        mqtt_topic: topic,
+        data: data,
+        timestamp: timestamp,
+      },
+    });
+
+    this.subscribers.forEach((subscriber) => {
+      try {
+        if (subscriber.readyState === 1) {
+          subscriber.send(logMessage);
+        } else {
+          this.subscribers.delete(subscriber);
+        }
+      } catch (error) {
+        console.error("❌ Error enviando log message:", error);
+        this.subscribers.delete(subscriber);
+      }
+    });
+  }
+
+  // Métodos para obtener datos
+  getAllGateways() {
+    return Array.from(this.gatewayData.values());
+  }
+
+  getAllEndpoints() {
+    return Array.from(this.endpointData.values());
+  }
+
+  getAllSensors() {
+    return Array.from(this.sensorData.values());
+  }
+
+  getGatewayById(gatewayId) {
+    return this.gatewayData.get(gatewayId);
+  }
+
+  getEndpointById(endpointId) {
+    return this.endpointData.get(endpointId);
+  }
+
+  getSensorById(sensorId) {
+    return this.sensorData.get(sensorId);
+  }
+
+  getSensorsByEndpoint(endpointId) {
+    return Array.from(this.sensorData.values()).filter(sensor => sensor.endpoint_id === endpointId);
+  }
+
+  getEndpointsByGateway(gatewayId) {
+    return Array.from(this.endpointData.values()).filter(endpoint => endpoint.gateway_id === gatewayId);
+  }
+
+  // Métodos para gestión de umbrales
+  updateThresholds(newThresholds) {
+    this.thresholds = { ...this.thresholds, ...newThresholds };
+    console.log("📊 Umbrales actualizados:", this.thresholds);
+    
+    // Re-evaluar todos los sensores con los nuevos umbrales
+    this.sensorData.forEach((sensor, sensorId) => {
+      const updatedSensor = {
+        ...sensor,
+        status: this.getSensorStatus(sensor.raw_data),
+        alerts: this.checkSensorAlerts(sensor.raw_data)
+      };
+      this.sensorData.set(sensorId, updatedSensor);
+    });
+  }
+
+  getThresholds() {
+    return { ...this.thresholds };
   }
 
   disconnect() {

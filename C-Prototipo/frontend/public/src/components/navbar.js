@@ -7,6 +7,7 @@
 import { el } from "../utils/dom.js";
 import { getState, subscribe, logout, ROLES_CONST } from "../state/store.js";
 import { clearSession, getToken } from "../api.js";
+import { rtClient } from "../ws.js";
 
 function navLink(hash, label) {
   return el("a", { href: `#/${hash}`, "data-nav": hash }, label);
@@ -104,19 +105,34 @@ function buildRight(user, role) {
               clearSession();
               logout();
               
-              // Redirigir a login
-              location.hash = "#/login";
+              // Cerrar WebSocket si está conectado
+              try {
+                if (rtClient && rtClient.ws) {
+                  rtClient.ws.close();
+                  console.log('WebSocket cerrado');
+                }
+              } catch (wsError) {
+                console.warn('Error cerrando WebSocket:', wsError);
+              }
               
-              // Recargar la página para limpiar completamente el estado
-              setTimeout(() => {
-                window.location.reload();
-              }, 100);
+              // Redirigir a login - el router manejará la navegación
+              location.hash = "#/login";
               
             } catch (error) {
               console.error('Error durante logout:', error);
               // Aún así, limpiar la sesión local y redirigir
               clearSession();
               logout();
+              
+              // Cerrar WebSocket en caso de error
+              try {
+                if (rtClient && rtClient.ws) {
+                  rtClient.ws.close();
+                }
+              } catch (wsError) {
+                console.warn('Error cerrando WebSocket:', wsError);
+              }
+              
               location.hash = "#/login";
             }
           },

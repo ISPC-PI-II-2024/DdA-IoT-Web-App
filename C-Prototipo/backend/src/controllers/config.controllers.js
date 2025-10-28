@@ -52,11 +52,20 @@ export async function getAdvancedConfig(req, res) {
     // Configuración avanzada (en producción, esto vendría de una BD)
     const config = {
       thresholds: {
-        tempMinNormal: 18.0,
-        tempMaxNormal: 25.0,
-        tempAlertaCalor: 30.0,
-        tempAlertaFrio: 5.0,
-        enableTempAlerts: true
+        // Umbrales de temperatura
+        tempMin: 15.0,
+        tempMax: 30.0,
+        tempCriticalMin: 5.0,
+        tempCriticalMax: 40.0,
+        // Umbrales de humedad
+        humidityMin: 30.0,
+        humidityMax: 80.0,
+        // Umbral de batería
+        batteryLow: 20.0,
+        // Configuración de alertas
+        enableTempAlerts: true,
+        enableHumidityAlerts: true,
+        enableBatteryAlerts: true
       },
       charts: {
         updateInterval: 1000,
@@ -595,22 +604,38 @@ export async function deleteMQTTTopic(req, res) {
 
 // Funciones de validación
 function validateThresholds(thresholds) {
-  if (thresholds.tempMinNormal && thresholds.tempMaxNormal) {
-    if (thresholds.tempMinNormal >= thresholds.tempMaxNormal) {
-      throw new Error("Temperatura mínima debe ser menor que máxima");
+  const validKeys = ['tempMin', 'tempMax', 'tempCriticalMin', 'tempCriticalMax', 'humidityMin', 'humidityMax', 'batteryLow'];
+  
+  for (const key of validKeys) {
+    if (thresholds[key] !== undefined) {
+      const value = parseFloat(thresholds[key]);
+      if (isNaN(value) || value < 0) {
+        throw new Error(`Umbral ${key} debe ser un número válido mayor o igual a 0`);
+      }
     }
   }
-  
-  if (thresholds.tempAlertaCalor && thresholds.tempMaxNormal) {
-    if (thresholds.tempAlertaCalor <= thresholds.tempMaxNormal) {
-      throw new Error("Umbral de alerta de calor debe ser mayor que temperatura máxima normal");
-    }
+
+  // Validar lógica de umbrales de temperatura
+  if (thresholds.tempMin && thresholds.tempMax && thresholds.tempMin >= thresholds.tempMax) {
+    throw new Error("Temperatura mínima debe ser menor que máxima");
   }
   
-  if (thresholds.tempAlertaFrio && thresholds.tempMinNormal) {
-    if (thresholds.tempAlertaFrio >= thresholds.tempMinNormal) {
-      throw new Error("Umbral de alerta de frío debe ser menor que temperatura mínima normal");
-    }
+  if (thresholds.tempCriticalMin && thresholds.tempMin && thresholds.tempCriticalMin >= thresholds.tempMin) {
+    throw new Error("Temperatura crítica mínima debe ser menor que temperatura mínima");
+  }
+  
+  if (thresholds.tempMax && thresholds.tempCriticalMax && thresholds.tempMax >= thresholds.tempCriticalMax) {
+    throw new Error("Temperatura máxima debe ser menor que temperatura crítica máxima");
+  }
+  
+  // Validar lógica de umbrales de humedad
+  if (thresholds.humidityMin && thresholds.humidityMax && thresholds.humidityMin >= thresholds.humidityMax) {
+    throw new Error("Humedad mínima debe ser menor que máxima");
+  }
+  
+  // Validar umbral de batería
+  if (thresholds.batteryLow && (thresholds.batteryLow < 0 || thresholds.batteryLow > 100)) {
+    throw new Error("Umbral de batería baja debe estar entre 0 y 100");
   }
 }
 

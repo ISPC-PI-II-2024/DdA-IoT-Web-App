@@ -12,8 +12,8 @@ export async function requireAuth(req, res, next) {
     if (ENV.DEV_MODE === 'true') {
       req.user = {
         sub: "dev-user",
-        email: ENV.DEV_USER_EMAIL,
-        name: ENV.DEV_USER_NAME,
+        email: ENV.DEV_USER_EMAIL || "admin@localhost.com",
+        name: ENV.DEV_USER_NAME || "Administrador Local",
         role: "admin",
         devMode: true
       };
@@ -29,8 +29,9 @@ export async function requireAuth(req, res, next) {
     const payload = await verifyAccessToken(token);
     req.user = payload; // {sub, email, name, role, iat, exp}
     next();
-  } catch {
-    return res.status(401).json({ error: "Token inválido" });
+  } catch (err) {
+    console.error("❌ Error en autenticación:", err.message);
+    return res.status(401).json({ error: "Token inválido", details: err.message });
   }
 }
 

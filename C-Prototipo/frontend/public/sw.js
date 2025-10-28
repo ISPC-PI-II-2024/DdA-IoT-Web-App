@@ -3,7 +3,7 @@
 // - Precache de shell mínimo
 // - Runtime cache GET (network-first con fallback a cache)
 // ==========================
-const CACHE = "shell-v3";
+const CACHE = "shell-v4";
 const ASSETS = [
   "/", 
   "/index.html", 
@@ -11,7 +11,16 @@ const ASSETS = [
   "/manifest.webmanifest",
   "/icons/Proyecto-logo.jpg",
   "/src/app.js",
-  "/src/api.js"
+  "/src/api.js",
+  "/src/loader.js",
+  "/src/router/index.js",
+  "/src/state/store.js",
+  "/src/utils/dom.js",
+  "/src/utils/storage.js",
+  "/src/ws.js",
+  "/src/components/navbar.js",
+  "/src/components/footer.js",
+  "/src/pwa-install.js"
 ];
 
 self.addEventListener("install", e => {

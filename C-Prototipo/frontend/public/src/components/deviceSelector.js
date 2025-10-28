@@ -1,5 +1,5 @@
 // ==========================
-// Componente de selección de dispositivos con buscador
+// Componente de selección de dispositivos con buscador y desplegable
 // ==========================
 import { el } from "../utils/dom.js";
 import { getState, setDevices, selectDevice } from "../state/store.js";
@@ -13,130 +13,163 @@ export async function deviceSelectorWidget() {
     try {
       await deviceService.getAllDevices();
     } catch (error) {
-      console.error('Error cargando dispositivos:', error);
+      console.error('[ERROR] Error cargando dispositivos:', error);
     }
   }
 
   const currentDevices = getState().devices;
 
-  // Crear el input de búsqueda
-  const searchInput = el("input", {
-    type: "text",
-    placeholder: "Buscar dispositivo por nombre o ID...",
-    class: "device-search-input",
-    style: "width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;"
-  });
-
-  // Crear el contenedor de resultados
-  const resultsContainer = el("div", {
-    class: "device-results",
-    style: "max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; background: white;"
-  });
-
-  // Crear el contenedor principal
+  // Crear el selector con buscador personalizado
   const container = el("div", {
     class: "device-selector",
-    style: "position: relative; width: 100%;"
-  }, searchInput, resultsContainer);
+    style: "position: relative; width: 100%; margin-bottom: 20px;"
+  });
 
-  // Función para filtrar dispositivos
-  function filterDevices(searchTerm) {
-    const filtered = currentDevices.filter(device => 
-      device.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.id_dispositivo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.tipo?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  // Título
+  const title = el("h3", {
+    style: "margin-bottom: 10px;"
+  }, "Dispositivo Seleccionado");
 
-    // Limpiar resultados anteriores
-    resultsContainer.innerHTML = "";
+  // Input de búsqueda
+  const searchInput = el("input", {
+    type: "text",
+    placeholder: "Buscar dispositivo...",
+    value: selectedDevice ? `${selectedDevice.nombre} (${selectedDevice.id_dispositivo})` : "",
+    class: "device-search-input",
+    style: "width: 100%; padding: 10px 35px 10px 10px; border: 1px solid #ddd; border-radius: 4px 4px 0 0; background: white; font-size: 14px;"
+  });
 
-    if (filtered.length === 0) {
-      resultsContainer.appendChild(el("div", {
-        style: "padding: 10px; color: #666; text-align: center;"
-      }, "No se encontraron dispositivos"));
-      return;
-    }
+  // Ícono de búsqueda
+  const searchIcon = el("span", {
+    style: "position: absolute; right: 12px; top: 47px; color: #999; pointer-events: none;"
+  }, "🔍");
 
-    // Crear elementos para cada dispositivo filtrado
-    filtered.forEach(device => {
-      const deviceElement = el("div", {
+  // Dropdown de opciones
+  const dropdown = el("div", {
+    class: "device-dropdown",
+    id: "device-dropdown",
+    style: "max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; background: white; display: none; position: absolute; width: 100%; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"
+  });
+
+  container.appendChild(title);
+  container.appendChild(searchInput);
+  container.appendChild(searchIcon);
+  container.appendChild(dropdown);
+
+  // Función para renderizar opciones
+  function renderOptions(filterText = '') {
+    dropdown.innerHTML = '';
+    const filter = filterText.toLowerCase();
+
+    // Si no hay filtro, mostrar todos los dispositivos
+    // Si hay filtro, mostrar solo los que coinciden
+    const filteredDevices = !filter ? currentDevices : 
+                           currentDevices.filter(device => {
+                             const deviceName = `${device.nombre} ${device.id_dispositivo}`.toLowerCase();
+                             return deviceName.includes(filter);
+                           });
+
+    filteredDevices.forEach(device => {
+      // Indicador de tipo
+      const typeColor = device.tipo === 'gateway' ? '#2196F3' : 
+                       device.tipo === 'endpoint' ? '#9C27B0' : '#FF9800';
+      const typeLabel = device.tipo === 'gateway' ? 'Gateway' : 
+                       device.tipo === 'endpoint' ? 'Endpoint' : 'Sensor';
+
+      const option = el("div", {
         class: "device-option",
-        style: `
-          padding: 10px;
-          cursor: pointer;
-          border-bottom: 1px solid #eee;
-          transition: background-color 0.2s;
-        `,
-        onmouseover: (e) => e.target.style.backgroundColor = "#f5f5f5",
-        onmouseout: (e) => e.target.style.backgroundColor = "white",
-        onclick: () => {
-          selectDevice(device);
-          resultsContainer.style.display = "none";
-          searchInput.value = device.nombre;
-          // Disparar evento personalizado para notificar la selección
-          container.dispatchEvent(new CustomEvent('deviceSelected', { 
-            detail: { device } 
-          }));
-        }
+        style: "padding: 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; transition: background 0.2s;"
       });
 
-      // Estado visual del dispositivo
-      const statusColor = device.estado === 'en_linea' ? '#4CAF50' : 
-                         device.estado === 'fuera_linea' ? '#FF9800' : '#F44336';
+      const optionContent = el("div", {
+        style: "display: flex; align-items: center; gap: 10px;"
+      },
+        el("span", {
+          style: `width: 10px; height: 10px; border-radius: 50%; background: ${typeColor}; flex-shrink: 0;`
+        }),
+        el("div", {
+          style: "flex: 1; min-width: 0;"
+        },
+          el("div", {
+            style: "font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+          }, device.nombre),
+          el("div", {
+            style: "font-size: 0.85em; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+          }, `${device.id_dispositivo} • ${device.ubicacion || 'Sin ubicación'}`)
+        ),
+        el("span", {
+          style: `background: ${typeColor}20; color: ${typeColor}; padding: 3px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; flex-shrink: 0;`
+        }, typeLabel)
+      );
       
-      deviceElement.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <strong>${device.nombre}</strong>
-            <div style="font-size: 0.9em; color: #666;">
-              ID: ${device.id_dispositivo} | Tipo: ${device.tipo || 'N/A'}
-            </div>
-            ${device.ubicacion ? `<div style="font-size: 0.8em; color: #888;">📍 ${device.ubicacion}</div>` : ''}
-          </div>
-          <div style="display: flex; align-items: center; gap: 5px;">
-            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: ${statusColor};"></span>
-            <span style="font-size: 0.8em; color: #666;">${device.estado}</span>
-          </div>
-        </div>
-      `;
-
-      resultsContainer.appendChild(deviceElement);
+      option.appendChild(optionContent);
+      
+      // Efecto hover
+      option.addEventListener('mouseenter', () => {
+        option.style.background = '#f5f5f5';
+      });
+      
+      option.addEventListener('mouseleave', () => {
+        option.style.background = 'white';
+      });
+      
+      option.addEventListener('click', () => {
+        selectDevice(device);
+        searchInput.value = `${device.nombre} (${device.id_dispositivo})`;
+        dropdown.style.display = 'none';
+        // Disparar evento personalizado
+        container.dispatchEvent(new CustomEvent('deviceSelected', { 
+          detail: { device } 
+        }));
+      });
+      
+      dropdown.appendChild(option);
     });
+
+    // Si no hay resultados
+    if (filteredDevices.length === 0) {
+      const noResults = el("div", {
+        style: "padding: 15px; text-align: center; color: #999;"
+      }, 
+        el("div", { style: "font-size: 2em; margin-bottom: 5px;" }, "🔍"),
+        el("div", {}, "No se encontraron dispositivos")
+      );
+      dropdown.appendChild(noResults);
+    }
   }
 
   // Event listeners
-  let searchTimeout;
-  searchInput.addEventListener('input', (e) => {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      const searchTerm = e.target.value.trim();
-      if (searchTerm.length > 0) {
-        resultsContainer.style.display = "block";
-        filterDevices(searchTerm);
-      } else {
-        resultsContainer.style.display = "none";
-      }
-    }, 300);
-  });
-
-  // Mostrar/ocultar resultados al hacer focus/blur
   searchInput.addEventListener('focus', () => {
-    if (searchInput.value.trim().length > 0) {
-      resultsContainer.style.display = "block";
-      filterDevices(searchInput.value.trim());
-    }
+    renderOptions(searchInput.value);
+    dropdown.style.display = 'block';
   });
 
-  // Ocultar resultados al hacer clic fuera
+  searchInput.addEventListener('input', (e) => {
+    const filterText = e.target.value;
+    renderOptions(filterText);
+    dropdown.style.display = 'block';
+  });
+
+  // Cerrar dropdown al hacer click fuera
   document.addEventListener('click', (e) => {
     if (!container.contains(e.target)) {
-      resultsContainer.style.display = "none";
+      dropdown.style.display = 'none';
     }
   });
 
-  // Si hay un dispositivo seleccionado, mostrarlo en el input
+  // Atajo de teclado para abrir el dropdown (Ctrl/Cmd + K)
+  searchInput.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      searchInput.focus();
+      renderOptions();
+      dropdown.style.display = 'block';
+    }
+  });
+
+  // Renderizar opciones iniciales si hay dispositivo seleccionado
   if (selectedDevice) {
-    searchInput.value = selectedDevice.nombre;
+    renderOptions();
   }
 
   return container;

@@ -21,7 +21,7 @@ class DeviceService {
     // Verificar cache primero
     const cached = cacheService.get(CACHE_KEYS.DEVICES);
     if (cached) {
-      console.log("📦 Dispositivos obtenidos del cache");
+      console.log("[CACHE] Dispositivos obtenidos del cache");
       return cached;
     }
 
@@ -41,7 +41,7 @@ class DeviceService {
     }
 
     this.isLoading = true;
-    console.log("🌐 Cargando dispositivos desde el servidor...");
+    console.log("[API] Cargando dispositivos desde el servidor...");
 
     try {
       // Timeout para evitar que se quede colgado
@@ -52,8 +52,9 @@ class DeviceService {
       const apiPromise = DevicesAPI.getAllDevices();
       const response = await Promise.race([apiPromise, timeoutPromise]);
 
-      if (response.success) {
-        const devices = response.data;
+      if (response && response.success) {
+        // Asegurar que data es un array
+        const devices = Array.isArray(response.data) ? response.data : [];
         
         // Cachear los dispositivos
         cacheService.set(CACHE_KEYS.DEVICES, devices, CACHE_TTL.DEVICES);
@@ -61,29 +62,18 @@ class DeviceService {
         // Actualizar el estado global
         setDevices(devices);
         
-        console.log(`✅ ${devices.length} dispositivos cargados y cacheados`);
+        console.log(`[API] ${devices.length} dispositivo(s) cargado(s) y cacheado(s)`);
         return devices;
       } else {
-        throw new Error("Error en respuesta del servidor");
+        throw new Error("Error en respuesta del servidor: " + JSON.stringify(response));
       }
     } catch (error) {
-      console.error("❌ Error cargando dispositivos:", error);
+      console.error("[ERROR] Error cargando dispositivos:", error);
       
-      // Fallback: devolver datos de ejemplo si el servidor falla
-      const fallbackDevices = [
-        {
-          id: 1,
-          id_dispositivo: "demo-device-001",
-          nombre: "Dispositivo Demo",
-          tipo: "sensor",
-          ubicacion: "Laboratorio",
-          estado: "activo",
-          ultima_conexion: new Date().toISOString(),
-          fecha_creacion: new Date().toISOString()
-        }
-      ];
+      // Fallback: devolver array vacío si el servidor falla
+      const fallbackDevices = [];
       
-      console.log("🔄 Usando datos de fallback");
+      console.log("[FALLBACK] Usando datos de fallback (array vacio)");
       cacheService.set(CACHE_KEYS.DEVICES, fallbackDevices, 60000); // 1 minuto
       setDevices(fallbackDevices);
       
@@ -104,11 +94,11 @@ class DeviceService {
     // Verificar cache
     const cached = cacheService.get(cacheKey);
     if (cached) {
-      console.log(`📦 Detalles del dispositivo ${deviceId} obtenidos del cache`);
+      console.log(`[CACHE] Detalles del dispositivo ${deviceId} obtenidos del cache`);
       return cached;
     }
 
-    console.log(`🌐 Cargando detalles del dispositivo ${deviceId}...`);
+    console.log(`[API] Cargando detalles del dispositivo ${deviceId}...`);
 
     try {
       // Timeout para evitar que se quede colgado
@@ -125,13 +115,13 @@ class DeviceService {
         // Cachear los detalles
         cacheService.set(cacheKey, device, CACHE_TTL.DEVICE_DETAILS);
         
-        console.log(`✅ Detalles del dispositivo ${deviceId} cargados y cacheados`);
+        console.log(`[API] Detalles del dispositivo ${deviceId} cargados y cacheados`);
         return device;
       } else {
         throw new Error("Error en respuesta del servidor");
       }
     } catch (error) {
-      console.error(`❌ Error cargando detalles del dispositivo ${deviceId}:`, error);
+      console.error(`[ERROR] Error cargando detalles del dispositivo ${deviceId}:`, error);
       
       // Fallback: devolver datos de ejemplo
       const fallbackDevice = {
@@ -146,7 +136,7 @@ class DeviceService {
         fecha_creacion: new Date().toISOString()
       };
       
-      console.log(`🔄 Usando datos de fallback para dispositivo ${deviceId}`);
+      console.log(`[FALLBACK] Usando datos de fallback para dispositivo ${deviceId}`);
       cacheService.set(cacheKey, fallbackDevice, 60000);
       return fallbackDevice;
     }
@@ -164,11 +154,11 @@ class DeviceService {
     // Verificar cache
     const cached = cacheService.get(cacheKey);
     if (cached) {
-      console.log(`📦 Datos de sensores del dispositivo ${deviceId} obtenidos del cache`);
+      console.log(`[CACHE] Datos de sensores del dispositivo ${deviceId} obtenidos del cache`);
       return cached;
     }
 
-    console.log(`🌐 Cargando datos de sensores del dispositivo ${deviceId}...`);
+    console.log(`[API] Cargando datos de sensores del dispositivo ${deviceId}...`);
 
     try {
       // Timeout para evitar que se quede colgado
@@ -185,13 +175,13 @@ class DeviceService {
         // Cachear los datos (TTL más corto para datos dinámicos)
         cacheService.set(cacheKey, sensorData, CACHE_TTL.DEVICE_SENSOR_DATA);
         
-        console.log(`✅ ${sensorData.length} registros de sensores cargados y cacheados`);
+        console.log(`[API] ${sensorData.length} registros de sensores cargados y cacheados`);
         return sensorData;
       } else {
         throw new Error("Error en respuesta del servidor");
       }
     } catch (error) {
-      console.error(`❌ Error cargando datos de sensores del dispositivo ${deviceId}:`, error);
+      console.error(`[ERROR] Error cargando datos de sensores del dispositivo ${deviceId}:`, error);
       
       // Fallback: devolver datos de ejemplo
       const fallbackData = [
@@ -213,7 +203,7 @@ class DeviceService {
         }
       ];
       
-      console.log(`🔄 Usando datos de fallback para sensores del dispositivo ${deviceId}`);
+      console.log(`[FALLBACK] Usando datos de fallback para sensores del dispositivo ${deviceId}`);
       cacheService.set(cacheKey, fallbackData, 60000);
       return fallbackData;
     }
@@ -230,11 +220,11 @@ class DeviceService {
     // Verificar cache
     const cached = cacheService.get(cacheKey);
     if (cached) {
-      console.log(`📦 Estadísticas del dispositivo ${deviceId} obtenidas del cache`);
+      console.log(`[CACHE] Estadisticas del dispositivo ${deviceId} obtenidas del cache`);
       return cached;
     }
 
-    console.log(`🌐 Cargando estadísticas del dispositivo ${deviceId}...`);
+    console.log(`[API] Cargando estadisticas del dispositivo ${deviceId}...`);
 
     try {
       // Timeout para evitar que se quede colgado
@@ -251,13 +241,13 @@ class DeviceService {
         // Cachear las estadísticas
         cacheService.set(cacheKey, stats, CACHE_TTL.DEVICE_STATS);
         
-        console.log(`✅ Estadísticas del dispositivo ${deviceId} cargadas y cacheadas`);
+        console.log(`[API] Estadisticas del dispositivo ${deviceId} cargadas y cacheadas`);
         return stats;
       } else {
         throw new Error("Error en respuesta del servidor");
       }
     } catch (error) {
-      console.error(`❌ Error cargando estadísticas del dispositivo ${deviceId}:`, error);
+      console.error(`[ERROR] Error cargando estadisticas del dispositivo ${deviceId}:`, error);
       
       // Fallback: devolver estadísticas de ejemplo
       const fallbackStats = {
@@ -268,7 +258,7 @@ class DeviceService {
         promedio_valor: 25.5
       };
       
-      console.log(`🔄 Usando estadísticas de fallback para dispositivo ${deviceId}`);
+      console.log(`[FALLBACK] Usando estadisticas de fallback para dispositivo ${deviceId}`);
       cacheService.set(cacheKey, fallbackStats, 60000);
       return fallbackStats;
     }
@@ -289,7 +279,7 @@ class DeviceService {
       cacheService.delete(key);
     });
 
-    console.log(`🗑️ Cache del dispositivo ${deviceId} invalidado`);
+    console.log(`[CACHE] Cache del dispositivo ${deviceId} invalidado`);
   }
 
   /**
@@ -297,7 +287,7 @@ class DeviceService {
    */
   invalidateAllDevicesCache() {
     cacheService.delete(CACHE_KEYS.DEVICES);
-    console.log("🗑️ Cache de dispositivos invalidado");
+    console.log("[CACHE] Cache de dispositivos invalidado");
   }
 
   /**

@@ -1,91 +1,24 @@
 // ==========================
 // Widget de Estado General con indicadores LED por dispositivo
+// Muestra datos de gateway/gateway y gateway/endpoint topics
 // ==========================
 import { el } from "../utils/dom.js";
 import { getState, setDevices } from "../state/store.js";
-import { deviceService } from "../utils/deviceService.js";
+import { GatewayAPI } from "../api.js";
 
 export async function generalStatusWidget() {
-  const { devices } = getState();
   
-  // Cargar dispositivos si no están cargados (solo una vez)
-  if (devices.length === 0) {
+  // Función para obtener estado del gateway y endpoints
+  async function getSystemStatus() {
     try {
-      await deviceService.getAllDevices();
+      const response = await GatewayAPI.getSystemStatus();
+      if (response && response.success) {
+        return response.data;
+      }
+      return null;
     } catch (error) {
-      console.error('Error cargando dispositivos:', error);
-    }
-  }
-
-  const currentDevices = getState().devices;
-
-  // Función para determinar el estado crítico de un dispositivo
-  async function getDeviceCriticalStatus(device) {
-    try {
-      // Obtener datos recientes del dispositivo (últimos 10 registros)
-      const sensorData = await deviceService.getDeviceSensorData(device.id_dispositivo, 10);
-      
-      if (!sensorData || sensorData.length === 0) {
-        return {
-          status: 'no_data',
-          color: '#FF9800', // Naranja para sin datos
-          message: 'Sin datos recientes'
-        };
-      }
-
-      // Definir umbrales críticos para diferentes tipos de sensores
-      const criticalThresholds = {
-        'temperatura': { min: 0, max: 50 }, // °C
-        'humedad': { min: 20, max: 80 }, // %
-        'co2': { min: 300, max: 1000 }, // ppm
-        'pm25': { min: 0, max: 25 }, // μg/m³
-        'presion': { min: 900, max: 1100 }, // hPa
-        'luminosidad': { min: 0, max: 10000 }, // lux
-        'vibracion': { min: 0, max: 2 }, // g
-        'sonido': { min: 0, max: 100 } // dB
-      };
-
-      let hasCriticalValues = false;
-      let criticalSensors = [];
-
-      // Verificar cada dato de sensor
-      for (const data of sensorData) {
-        const threshold = criticalThresholds[data.tipo_sensor];
-        if (threshold) {
-          const value = parseFloat(data.valor);
-          if (value < threshold.min || value > threshold.max) {
-            hasCriticalValues = true;
-            criticalSensors.push({
-              sensor: data.tipo_sensor,
-              value: value,
-              unit: data.unidad,
-              threshold: threshold
-            });
-          }
-        }
-      }
-
-      if (hasCriticalValues) {
-        return {
-          status: 'critical',
-          color: '#F44336', // Rojo para valores críticos
-          message: `${criticalSensors.length} sensor(es) con valores críticos`,
-          criticalSensors: criticalSensors
-        };
-      } else {
-        return {
-          status: 'normal',
-          color: '#4CAF50', // Verde para valores normales
-          message: 'Todos los sensores funcionando normalmente'
-        };
-      }
-    } catch (error) {
-      console.error('Error verificando estado crítico:', error);
-      return {
-        status: 'error',
-        color: '#9E9E9E', // Gris para error
-        message: 'Error verificando estado'
-      };
+      console.error('Error obteniendo estado del sistema:', error);
+      return null;
     }
   }
 
@@ -113,133 +46,142 @@ export async function generalStatusWidget() {
     style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;"
   });
 
-  // Función para actualizar el estado de todos los dispositivos
+  // Función para actualizar el estado de gateway y endpoints
   async function updateDevicesStatus() {
     devicesContainer.innerHTML = "";
     
     // Mostrar indicador de carga
     const loadingDiv = el("div", {
       style: "text-align: center; padding: 20px; color: #666; grid-column: 1 / -1;"
-    }, "Verificando estado de dispositivos...");
+    }, "Cargando estado del sistema...");
     devicesContainer.appendChild(loadingDiv);
 
-    // Verificar estado de cada dispositivo
-    const statusPromises = currentDevices.map(async (device) => {
-      const criticalStatus = await getDeviceCriticalStatus(device);
-      return { device, criticalStatus };
-    });
-
     try {
-      const deviceStatuses = await Promise.all(statusPromises);
+      const systemData = await getSystemStatus();
       
+      if (!systemData) {
+        devicesContainer.innerHTML = "";
+        devicesContainer.appendChild(el("div", {
+          style: "text-align: center; padding: 20px; color: #d32f2f; grid-column: 1 / -1;"
+        }, "Error obteniendo estado del sistema"));
+        return;
+      }
+
       // Limpiar indicador de carga
       devicesContainer.innerHTML = "";
 
-      // Crear cards para cada dispositivo
-      deviceStatuses.forEach(({ device, criticalStatus }) => {
-        const deviceCard = el("div", {
-          style: `
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            background: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
-          `,
-          onmouseover: (e) => {
-            e.target.style.transform = 'translateY(-2px)';
-            e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
-          },
-          onmouseout: (e) => {
-            e.target.style.transform = 'translateY(0)';
-            e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-          }
-        });
+      const { gateways, endpoints } = systemData;
 
-        // LED indicator
-        const ledIndicator = el("div", {
-          style: `
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background-color: ${criticalStatus.color};
-            box-shadow: 0 0 8px ${criticalStatus.color}40;
-            margin-right: 10px;
-            animation: ${criticalStatus.status === 'critical' ? 'pulse 2s infinite' : 'none'};
-          `
-        });
-
-        // Información del dispositivo
-        const deviceInfo = el("div", {
-          style: "flex: 1;"
-        });
-
-        const deviceName = el("div", {
-          style: "font-weight: bold; margin-bottom: 5px;"
-        }, device.nombre);
-
-        const deviceId = el("div", {
-          style: "font-size: 0.9em; color: #666; margin-bottom: 5px;"
-        }, `ID: ${device.id_dispositivo}`);
-
-        const deviceType = el("div", {
-          style: "font-size: 0.8em; color: #888; margin-bottom: 8px;"
-        }, `Tipo: ${device.tipo || 'N/A'}`);
-
-        const statusMessage = el("div", {
-          style: `
-            font-size: 0.8em;
-            color: ${criticalStatus.color};
-            font-weight: ${criticalStatus.status === 'critical' ? 'bold' : 'normal'};
-          `
-        }, criticalStatus.message);
-
-        // Detalles críticos si los hay
-        let criticalDetails = null;
-        if (criticalStatus.criticalSensors && criticalStatus.criticalSensors.length > 0) {
-          criticalDetails = el("div", {
-            style: "margin-top: 8px; font-size: 0.7em; color: #d32f2f;"
-          });
+      // Mostrar gateways desde gateway/gateway topic
+      if (gateways && gateways.length > 0) {
+        gateways.forEach(gateway => {
+          const statusColor = gateway.lora_status === 'ok' ? '#4CAF50' : '#d32f2f';
           
-          criticalStatus.criticalSensors.forEach(sensor => {
-            const sensorDiv = el("div", {
-              style: "margin-bottom: 2px;"
-            }, `• ${sensor.sensor}: ${sensor.value}${sensor.unit} (límite: ${sensor.threshold.min}-${sensor.threshold.max}${sensor.unit})`);
-            criticalDetails.appendChild(sensorDiv);
+          const gatewayCard = el("div", {
+            style: `
+              border: 1px solid #ddd;
+              border-radius: 8px;
+              padding: 15px;
+              background: white;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            `
           });
-        }
 
-        // Estado de conexión
-        const connectionStatus = el("div", {
-          style: `
-            font-size: 0.7em;
-            color: ${device.estado === 'en_linea' ? '#4CAF50' : device.estado === 'fuera_linea' ? '#FF9800' : '#F44336'};
-            margin-top: 5px;
-          `
-        }, `Conexión: ${device.estado}`);
+          const ledIndicator = el("div", {
+            style: `
+              width: 12px;
+              height: 12px;
+              border-radius: 50%;
+              background-color: ${statusColor};
+              box-shadow: 0 0 8px ${statusColor}40;
+              margin-right: 10px;
+            `
+          });
 
-        // Construir la card
-        deviceInfo.appendChild(deviceName);
-        deviceInfo.appendChild(deviceId);
-        deviceInfo.appendChild(deviceType);
-        deviceInfo.appendChild(statusMessage);
-        if (criticalDetails) deviceInfo.appendChild(criticalDetails);
-        deviceInfo.appendChild(connectionStatus);
+          const gatewayInfo = el("div", { style: "flex: 1;" },
+            el("div", { style: "font-weight: bold; margin-bottom: 5px;" }, `Gateway ${gateway.id}`),
+            el("div", { style: "font-size: 0.9em; color: #666;" }, `LoRa: ${gateway.lora_status}`),
+            el("div", { style: "font-size: 0.9em; color: #666;" }, `WiFi: ${gateway.wifi_signal}`),
+            el("div", { style: "font-size: 0.9em; color: #666;" }, `Uptime: ${gateway.uptime}`)
+          );
 
-        const cardContent = el("div", {
-          style: "display: flex; align-items: flex-start;"
-        }, ledIndicator, deviceInfo);
+          gatewayCard.appendChild(el("div", { style: "display: flex; align-items: flex-start;" }, ledIndicator, gatewayInfo));
+          devicesContainer.appendChild(gatewayCard);
+        });
+      }
 
-        deviceCard.appendChild(cardContent);
-        devicesContainer.appendChild(deviceCard);
-      });
+      // Mostrar endpoints desde gateway/endpoint topic
+      if (endpoints && endpoints.length > 0) {
+        endpoints.forEach(endpoint => {
+          const statusColor = endpoint.status === 'ok' ? '#4CAF50' : 
+                              endpoint.status === 'battery_low' ? '#FF9800' : '#d32f2f';
+          
+          const endpointCard = el("div", {
+            style: `
+              border: 1px solid #ddd;
+              border-radius: 8px;
+              padding: 15px;
+              background: white;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            `
+          });
+
+          const ledIndicator = el("div", {
+            style: `
+              width: 12px;
+              height: 12px;
+              border-radius: 50%;
+              background-color: ${statusColor};
+              box-shadow: 0 0 8px ${statusColor}40;
+              margin-right: 10px;
+            `
+          });
+
+          const endpointInfo = el("div", { style: "flex: 1;" },
+            el("div", { style: "font-weight: bold; margin-bottom: 5px;" }, `Endpoint ${endpoint.id}`),
+            el("div", { style: "font-size: 0.9em; color: #666;" }, `Batería: ${endpoint.bateria}%`),
+            el("div", { style: "font-size: 0.9em; color: #666;" }, `Cargando: ${endpoint.cargando ? 'Sí' : 'No'}`),
+            el("div", { style: "font-size: 0.9em; color: #666;" }, `LoRa: ${endpoint.lora}`),
+            el("div", { style: "font-size: 0.9em; color: #666;" }, `Sensores: ${endpoint.sensores}`)
+          );
+
+          endpointCard.appendChild(el("div", { style: "display: flex; align-items: flex-start;" }, ledIndicator, endpointInfo));
+          devicesContainer.appendChild(endpointCard);
+        });
+      }
+
+      if ((!gateways || gateways.length === 0) && (!endpoints || endpoints.length === 0)) {
+        devicesContainer.appendChild(el("div", {
+          style: "text-align: center; padding: 20px; color: #666; grid-column: 1 / -1;"
+        }, 
+          el("div", { style: "font-size: 2em; margin-bottom: 10px;" }, "📡"),
+          el("p", { style: "margin-bottom: 10px;" }, "No hay datos de gateway o endpoints disponibles"),
+          el("p", { style: "font-size: 0.85em; color: #888;" }, "Los datos aparecerán cuando los dispositivos envíen información por MQTT")
+        ));
+      }
 
     } catch (error) {
-      console.error('Error actualizando estado de dispositivos:', error);
+      console.error('Error actualizando estado:', error);
       devicesContainer.innerHTML = "";
+      
+      let errorMessage = "Error verificando estado del sistema";
+      if (error.status === 404 || error.message?.includes('404')) {
+        errorMessage = "Endpoint no encontrado. Verifica que el backend esté corriendo.";
+      } else if (error.message) {
+        errorMessage = `Error: ${error.message}`;
+      }
+      
       devicesContainer.appendChild(el("div", {
         style: "text-align: center; padding: 20px; color: #d32f2f; grid-column: 1 / -1;"
-      }, "Error verificando estado de dispositivos"));
+      },
+        el("div", { style: "font-size: 2em; margin-bottom: 10px;" }, "❌"),
+        el("p", { style: "margin-bottom: 10px;" }, errorMessage),
+        el("button", {
+          class: "btn btn-sm",
+          style: "margin-top: 10px;",
+          onclick: updateDevicesStatus
+        }, "🔄 Reintentar")
+      ));
     }
   }
 

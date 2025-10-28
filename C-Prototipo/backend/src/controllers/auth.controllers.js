@@ -14,13 +14,17 @@ const GOOGLE_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth
 export async function googleAuth(req, res) {
   try {
     const { credential } = req.body || {};
+    console.log("📧 Received auth request, credential length:", credential?.length || 0);
+    
     if (!credential) return res.status(400).json({ error: "credential requerido" });
 
     // 1) Verificar el ID Token de Google (audience = tu client_id)
+    console.log("🔐 Verifying token with client_id:", ENV.GOOGLE_CLIENT_ID);
     const { payload } = await jwtVerify(credential, GOOGLE_JWKS, {
       issuer: ["https://accounts.google.com", "accounts.google.com"],
       audience: ENV.GOOGLE_CLIENT_ID
     });
+    console.log("✅ Token verified, email:", payload.email);
 
     // 2) Extraer identidad
     const email = payload.email;
@@ -62,8 +66,9 @@ export async function googleAuth(req, res) {
       expiresIn: ENV.JWT_EXPIRES_IN
     });
   } catch (err) {
-    console.error("auth/google error:", err);
-    return res.status(401).json({ error: "Token inválido" });
+    console.error("❌ auth/google error:", err.message);
+    console.error("Stack:", err.stack);
+    return res.status(401).json({ error: "Token inválido", details: err.message });
   }
 }
 

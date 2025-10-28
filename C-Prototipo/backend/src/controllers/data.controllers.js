@@ -3,7 +3,17 @@
 // --------------------------------------------------------------------
 
 // IMPORTACIONES
-import { getAllDevices, getDeviceById, getDeviceSensorData, getDeviceStats } from "../service/data.service.js";
+import { 
+  getAllDevices, 
+  getDeviceById, 
+  getDeviceSensorData, 
+  getDeviceStats,
+  createOrUpdateDevice,
+  syncGatewayToDB,
+  syncEndpointToDB,
+  syncSensorToDB,
+  getHistoricalSensorDataFromInfluxDB
+} from "../service/data.service.js";
 
 // --------------------------------------------------------------------
 // FUNCIONES
@@ -15,10 +25,14 @@ import { getAllDevices, getDeviceById, getDeviceSensorData, getDeviceStats } fro
 export async function getAllDevicesController(req, res) {
   try {
     const devices = await getAllDevices();
+    
+    // Asegurar que devices es un array
+    const devicesArray = Array.isArray(devices) ? devices : [];
+    
     res.json({
       success: true,
-      data: devices,
-      count: devices.length
+      data: devicesArray,
+      count: devicesArray.length
     });
   } catch (error) {
     console.error('Error en getAllDevicesController:', error);
@@ -112,9 +126,33 @@ export async function getDeviceSensorDataController(req, res) {
   }
 }
 
-// EXPORTACION
-export default {
-  getAllDevicesController,
-  getDeviceByIdController,
-  getDeviceSensorDataController
-};
+/**
+ * Obtiene datos históricos de sensores desde InfluxDB
+ */
+export async function getHistoricalDataController(req, res) {
+  try {
+    const { deviceId } = req.params;
+    const { limit = 100, timeRange = "24h" } = req.query;
+    
+    const historicalData = await getHistoricalSensorDataFromInfluxDB(
+      deviceId, 
+      parseInt(limit), 
+      timeRange
+    );
+    
+    res.json({
+      success: true,
+      data: historicalData,
+      count: historicalData.length,
+      timeRange,
+      source: 'influxdb'
+    });
+  } catch (error) {
+    console.error('Error en getHistoricalDataController:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor',
+      message: error.message
+    });
+  }
+}
