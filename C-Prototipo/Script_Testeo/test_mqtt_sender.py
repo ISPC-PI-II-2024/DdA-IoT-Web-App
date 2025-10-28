@@ -38,12 +38,51 @@ NUM_SENSORS = 4
 TEMP_MIN = 15.0
 TEMP_MAX = 30.0
 HUMIDITY_MIN = 40
-HUMIDITY_MAX = 80
+HUMIDITY_MAX = 65
 BATTERY_MIN = 50
 BATTERY_MAX = 100
 
 # Generar datos más realistas con variación en estados
 REALISTIC_MODE = True  # Activar para estados más variados
+
+# =========================
+# MODELO GAUSSIANO (REALISTA)
+# =========================
+# Objetivos de operación y parámetros del modelo
+TEMP_TARGET = 24.0
+HUMIDITY_TARGET = 55.0
+
+# Desviación de los incrementos gaussianos
+TEMP_STEP_STD = 0.5
+HUMIDITY_STEP_STD = 2.0
+
+# Factor de reversión a la media (0..1). Valores más altos vuelven más rápido al objetivo
+MEAN_REVERSION = 0.12
+
+# Estado previo por sensor para continuidad temporal entre ciclos
+_PREV_SENSOR_VALUES = {}  # clave: (gateway_id, endpoint_id, sensor_id) → {"temp": float, "humedad": float}
+
+
+def _bounded(value, min_value, max_value):
+    """Limita un valor entre mínimos y máximos."""
+    if value < min_value:
+        return min_value
+    if value > max_value:
+        return max_value
+    return value
+
+
+def _next_gaussian(prev_value, target, step_std, min_value, max_value):
+    """
+    Siguiente valor con:
+    - incremento gaussiano ~ N(0, step_std^2)
+    - reversión a la media hacia 'target'
+    - límites [min_value, max_value]
+    """
+    gaussian_step = random.gauss(0.0, step_std)
+    mean_revert = MEAN_REVERSION * (target - prev_value)
+    next_value = prev_value + gaussian_step + mean_revert
+    return _bounded(next_value, min_value, max_value)
 
 
 def generate_uptime():
@@ -106,27 +145,41 @@ def generate_sensor_data(gateway_id, num_endpoints=NUM_ENDPOINTS, num_sensors=NU
         
         for s in range(1, num_sensors + 1):
             sensor_id = f"0F{s:02d}"
-            
+
             if REALISTIC_MODE:
-                # Generar valores con más variación y ocasionalmente fuera de rango
-                temp = round(random.uniform(TEMP_MIN - 5, TEMP_MAX + 5), 1)
-                humedad = random.randint(HUMIDITY_MIN - 10, HUMIDITY_MAX + 10)
+                key = (gateway_id, endpoint_id, sensor_id)
+                prev = _PREV_SENSOR_VALUES.get(key)
+
+                if prev is None:
+                    # Inicializar cerca del objetivo con pequeña dispersión
+                    init_temp = _bounded(random.gauss(TEMP_TARGET, 1.0), TEMP_MIN, TEMP_MAX)
+                    init_hum = _bounded(random.gauss(HUMIDITY_TARGET, 3.0), HUMIDITY_MIN, HUMIDITY_MAX)
+                    prev = {"temp": init_temp, "humedad": init_hum}
+
+                temp_val = _next_gaussian(prev["temp"], TEMP_TARGET, TEMP_STEP_STD, TEMP_MIN, TEMP_MAX)
+                hum_val = _next_gaussian(prev["humedad"], HUMIDITY_TARGET, HUMIDITY_STEP_STD, HUMIDITY_MIN, HUMIDITY_MAX)
+
+                # Persistir para el siguiente ciclo
+                _PREV_SENSOR_VALUES[key] = {"temp": temp_val, "humedad": hum_val}
+
+                temp = round(temp_val, 1)
+                humedad = int(round(hum_val))
             else:
                 temp = round(random.uniform(TEMP_MIN, TEMP_MAX), 1)
                 humedad = random.randint(HUMIDITY_MIN, HUMIDITY_MAX)
-            
-            # Determinar estado del sensor basado en valores
+
+            # Determinar estado del sensor basado en valores y nuevos máximos
             if temp < 10:
                 estado = "temp_critical_low"
-            elif temp > 38:
+            elif temp > 30:
                 estado = "temp_critical_high"
             elif temp < 18 or temp > 28:
                 estado = "temp_out_of_range"
-            elif humedad < 25 or humedad > 85:
+            elif humedad < 25 or humedad > 65:
                 estado = "humidity_out_of_range"
             else:
                 estado = "ok"
-            
+
             sensores.append({
                 "id": sensor_id,
                 "posicion": s,
