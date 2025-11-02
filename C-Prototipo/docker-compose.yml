@@ -219,7 +219,7 @@ services:
       - mariadb
       - mosquitto
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -235,7 +235,7 @@ services:
     ports:
       - "5000:80"
     volumes:
-    - ./frontend/public:/usr/share/nginx/html:ro
+      - ./frontend/public:/usr/share/nginx/html:ro
     networks:
       - silo-network
     depends_on:

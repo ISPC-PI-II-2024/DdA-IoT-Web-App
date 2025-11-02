@@ -14,7 +14,16 @@ export function el(tag, attrs = {}, ...children) {
   });
   children.flat().forEach(ch => {
     if (ch == null) return;
-    node.appendChild(typeof ch === "string" ? document.createTextNode(ch) : ch);
+    // Manejar diferentes tipos de children
+    if (typeof ch === "string" || typeof ch === "number" || typeof ch === "boolean") {
+      node.appendChild(document.createTextNode(String(ch)));
+    } else if (ch instanceof Node) {
+      node.appendChild(ch);
+    } else {
+      // Si es un objeto u otro tipo, intentar convertirlo a string
+      console.warn(`[dom.js] Intentando convertir tipo no soportado a string:`, typeof ch, ch);
+      node.appendChild(document.createTextNode(String(ch)));
+    }
   });
   return node;
 }

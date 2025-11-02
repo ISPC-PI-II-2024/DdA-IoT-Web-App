@@ -1,8 +1,12 @@
 # Aplicación Web IoT - Guía de Usuario
 
+![Pantalla de Inicio de Sesión](D-Presentacion/Capturas-APP/Pantalla%20de%20ingreso.png)
+
 ## Descripción General
 
-Este sistema te permite monitorear LOS datos de temperatura y humedad, (probablmente tambien CO2 en caso de implementarlo) de sensores IoT en tiempo real, gestionar configuraciones del sistema y controlar dispositivos según tu rol asignado. La aplicación proporciona una interfaz web moderna para visualizar datos de sensores y gestionar tu infraestructura IoT de los elementos desplegados en los silos de cereales, todo como parte del proyecto Intertecnicatura del ISPC.
+Este sistema te permite monitorear datos de temperatura, humedad y CO2 de sensores IoT en tiempo real, gestionar configuraciones del sistema y controlar dispositivos según tu rol asignado. La aplicación proporciona una interfaz web moderna para visualizar datos de sensores y gestionar tu infraestructura IoT de los elementos desplegados en los silos de cereales, todo como parte del proyecto Intertecnicatura del ISPC.
+
+La aplicación utiliza una arquitectura jerárquica de dispositivos: **Gateway → Endpoints → Sensores**, donde cada gateway gestiona múltiples endpoints, y cada endpoint contiene varios sensores que miden variables ambientales.
 
 ## Comenzando
 
@@ -86,46 +90,88 @@ El sistema utiliza tres roles distintos, cada uno con diferentes niveles de acce
 
 ## Características del Dashboard
 
-### Monitoreo de Temperatura en Tiempo Real
+![Dashboard Principal](D-Presentacion/Capturas-APP/dashboard-dashboard-sensor.png)
+
+El dashboard principal es el centro de control de tu aplicación IoT. Proporciona una visión completa del estado del sistema y permite monitorear todos los sensores en tiempo real.
+
+### Monitoreo de Sensores en Tiempo Real
 
 El dashboard principal muestra:
 
-**📊 Gráfico de Temperatura**
-- Lecturas de temperatura en vivo desde sensores
-- Visualización de datos históricos
+**📊 Visualización de Sensores**
+- Lecturas de temperatura, humedad y CO2 en vivo desde sensores
+- Visualización de datos históricos con gráficos interactivos
 - Rangos de tiempo configurables
-- Soporte para múltiples sensores
+- Soporte para múltiples sensores por endpoint
+- Visualización jerárquica de Gateway → Endpoints → Sensores
+
+![Estructura IoT](D-Presentacion/Capturas-APP/dashboard-estructura-IoT.png)
 
 **📈 Panel de Estadísticas**
-- Temperatura actual
-- Temperatura promedio
+- Valores actuales de cada sensor
+- Promedios y estadísticas de cada tipo de medición
 - Valores mínimo/máximo
 - Cantidad de puntos de datos
 - Timestamp de última actualización
+
+![Estado del Sistema](D-Presentacion/Capturas-APP/dashboard-estadosistema.png)
 
 **🔗 Estado de Conexión**
 - Estado de conexión del broker MQTT
 - Indicador de conexión WebSocket
 - Estado de transmisión de datos
 - Indicadores de salud del sistema
+- Estado de gateways, endpoints y sensores
+
+**📡 Logs MQTT en Tiempo Real**
+- Visualización de mensajes MQTT recibidos
+- Filtrado por tipo de mensaje (gateway, endpoint, sensor)
+- Timestamps precisos de cada mensaje
+- Control de auto-scroll y expansión de logs
+
+![Logs MQTT](D-Presentacion/Capturas-APP/dashboard-logs.png)
+
+### Gestión de Dispositivos
+
+**Vista General de Dispositivos**
+La página de dispositivos muestra la estructura completa del sistema:
+
+![Vista General de Dispositivos](D-Presentacion/Capturas-APP/dispositivos-estadogeneral.png)
+
+- **Jerarquía visual**: Gateway → Endpoints → Sensores
+- **Estadísticas generales**: Total de gateways, endpoints y sensores
+- **Estado en tiempo real**: Indicadores de estado en línea/fuera de línea
+- **Información detallada**: Ubicación, estado de batería, y estado de conexión LoRa
+
+**Histórico de Sensores**
+Cada dispositivo permite visualizar su histórico de datos:
+
+![Histórico de Sensor](D-Presentacion/Capturas-APP/dispositivo-historico-sensor.png)
+
+- **Datos desde MariaDB**: Últimos registros procesados de sensores
+- **Datos desde InfluxDB**: Mensajes MQTT históricos de las últimas 24 horas
+- **Tabs intercambiables**: Cambia entre ambas fuentes de datos
 
 ### Controles de Gráficos
 
 **Selección de Rango de Tiempo**
-- Actualizaciones en tiempo real (intervalos de 1 segundo)
+- Actualizaciones en tiempo real (intervalos configurables desde 15 segundos)
 - Visualización de datos históricos
-- Puntos de datos personalizables
+- Puntos de datos personalizables (10-1000 puntos)
 - Gráficos con escala automática
 
 **Visualización de Datos**
-- Gráficos de líneas suaves
-- Zonas de temperatura codificadas por colores
-- Tooltips interactivos
+- Gráficos de líneas suaves para temperatura, humedad y CO2
+- Zonas de valores codificadas por colores (normal, alerta, crítico)
+- Tooltips interactivos con valores precisos
 - Diseño responsivo para dispositivos móviles
+- Visualización SVG de dispositivos con posición de sensores
 
 ## Gestión de Configuración
 
 ### Configuración General (Todos los Usuarios Autenticados)
+
+![Página de Configuración](D-Presentacion/Capturas-APP/Configuracion.png)
 
 Accede a la página **Configuración** para ver y modificar configuraciones básicas:
 
@@ -137,41 +183,58 @@ Accede a la página **Configuración** para ver y modificar configuraciones bás
 
 **Configuraciones de Visualización**
 - Unidad de temperatura (Celsius/Fahrenheit)
-- Intervalos de actualización de gráficos
-- Puntos máximos de datos en gráficos
+- Intervalos de actualización de gráficos (15 segundos mínimo)
+- Puntos máximos de datos en gráficos (10-1000)
 - Preferencias de visualización
+
+**Configuración de Notificaciones**
+- Permitir notificaciones del navegador
+- Alertas sonoras
+- Prueba de notificaciones
 
 ### Configuración Avanzada (Solo Administradores)
 
 Accede a la página **Configuración Avanzada** para configuraciones a nivel del sistema:
 
-**Umbrales de Temperatura**
-(valor generales, despues lo adaptaremos segun llegemos a concenso con el resto del equipo y segun la documentacion y requerimientos de TS de AGRO)
+**Umbrales de Sensores**
+Configura los valores límite para generar alertas automáticas:
+
 ```
-Rango Normal: 18°C - 25°C
-Alerta de Calor: Por encima de 30°C
-Alerta de Frío: Por debajo de 5°C
+Temperatura:
+- Mínima Normal: 0°C (configurable)
+- Máxima Normal: 50°C (configurable)
+- Mínima Crítica: < Mínima Normal
+- Máxima Crítica: > Máxima Normal
+
+Humedad:
+- Mínima: 20% (configurable)
+- Máxima: 80% (configurable)
+
+Batería:
+- Umbral Bajo: Configurable (0-100%)
 ```
 
 **Configuración de Gráficos**
-- Intervalo de actualización: 100ms - 60s
+- Intervalo de actualización: 15 segundos (mínimo) - 5 minutos
 - Puntos de datos: 10 - 1000
 - Escala automática: Activada/Desactivada
 - Modo tiempo real: Activado/Desactivado
 
 **Configuraciones MQTT**
-- Suscripciones a tópicos
+- Estado de conexión del broker
+- Gestión de tópicos MQTT suscritos
 - Niveles QoS (0, 1, 2)
-- Timeout de conexión
-- Intentos de reconexión
+- Reinicio de conexión MQTT
+- Monitoreo de mensajes en tiempo real
 
 **Configuraciones de Notificaciones**
-- Notificaciones por email
-- Períodos de cooldown de alertas
+- Notificaciones del navegador
+- Alertas sonoras
+- Gestión de alertas activas
 - Preferencias de logging
-- Modo debug
 
 **Configuraciones del Sistema**
+- Limpieza de cache de datos
 - Modo de mantenimiento
 - Configuraciones de respaldo
 - Niveles de log
@@ -181,28 +244,53 @@ Alerta de Frío: Por debajo de 5°C
 
 ### Entendiendo los Tópicos MQTT
 
-El sistema se suscribe a tópicos MQTT para recibir datos de sensores:
+El sistema se suscribe a tópicos MQTT para recibir datos de sensores siguiendo una estructura jerárquica:
 
-**Tópicos por Defecto:**
-(Los de prueba claramente, despues segun lo definan back y embebido, ajustaremos a los existentes)
-- `vittoriodurigutti/prueba` - Datos de prueba
-- `vittoriodurigutti/temperature` - Lecturas de temperatura
-- `vittoriodurigutti/sensor/+` - Todos los datos de sensores
+**Tópicos del Sistema:**
+- `gateway/gateway` - Estado y datos de gateways LoRa
+- `gateway/endpoint` - Estado y datos de endpoints
+- `gateway/sensor` - Lecturas de sensores (temperatura, humedad, CO2)
+- `temperature` - Mensajes de temperatura (compatibilidad)
+- `co2` - Mensajes de CO2
+- `humidity` - Mensajes de humedad
 
 ### Formatos de Datos
 
-**Formato JSON (Recomendado):**
-(tambien. generico y lo adaptaremos segun back y embebdio)
+**Formato JSON para Gateways:**
 ```json
 {
-  "temperature": 23.5,
-  "humidity": 65.2,
-  "sensor_id": "temp_001",
+  "id": "gw001",
+  "lora_status": "ok",
   "timestamp": "2024-01-01T12:00:00Z"
 }
 ```
 
-**Formato Numérico Simple:**
+**Formato JSON para Endpoints:**
+```json
+{
+  "id": "ep001",
+  "gateway_id": "gw001",
+  "status": "ok",
+  "battery": 85,
+  "timestamp": "2024-01-01T12:00:00Z"
+}
+```
+
+**Formato JSON para Sensores:**
+```json
+{
+  "id": "sensor001",
+  "gateway_id": "gw001",
+  "endpoint_id": "ep001",
+  "temperature": 23.5,
+  "humidity": 65.2,
+  "co2": 450,
+  "status": "ok",
+  "timestamp": "2024-01-01T12:00:00Z"
+}
+```
+
+**Formato Numérico Simple (compatibilidad):**
 ```
 23.5
 ```
@@ -215,21 +303,38 @@ El sistema se suscribe a tópicos MQTT para recibir datos de sensores:
 - Validación de datos y manejo de errores
 - Actualizaciones de estado en tiempo real
 
+## Navegación y Páginas
+
+![Menú de Navegación](D-Presentacion/Capturas-APP/tab-menu.png)
+
+La aplicación incluye las siguientes páginas principales:
+
+- **Dashboard**: Panel principal con visualización de sensores en tiempo real
+- **Dispositivos**: Vista jerárquica de todos los dispositivos IoT
+- **Configuración**: Configuración general del sistema
+- **Configuración Avanzada**: Configuraciones administrativas (solo administradores)
+- **Sobre Nosotros**: Información del proyecto
+
+![Página Sobre Nosotros](D-Presentacion/Capturas-APP/sobre-nosotros.png)
+
 ## Solución de Problemas
 
 ### Problemas Comunes y Soluciones
 
-**🔴 No se Muestran Datos de Temperatura**
+**🔴 No se Muestran Datos de Sensores**
 
 *Posibles causas:*
 - Broker MQTT no conectado
-- Ningún sensor publicando datos
+- Ningún sensor/gateway publicando datos
 - Configuración incorrecta de tópicos
+- Dispositivo no seleccionado en el dashboard
 
 *Soluciones:*
-1. Verificar estado de conexión MQTT en el dashboard
-2. Verificar que el sensor esté publicando al tópico correcto
-3. Contactar al administrador para verificar configuración de tópicos
+1. Verificar estado de conexión MQTT en el dashboard (sección de logs)
+2. Verificar que los gateways, endpoints y sensores estén publicando a los tópicos correctos (`gateway/gateway`, `gateway/endpoint`, `gateway/sensor`)
+3. Seleccionar un dispositivo en el selector de dispositivos del dashboard
+4. Verificar la página "Dispositivos" para ver el estado de todos los dispositivos
+5. Contactar al administrador para verificar configuración de tópicos
 
 **🔴 Los Gráficos No se Actualizan**
 
@@ -237,12 +342,16 @@ El sistema se suscribe a tópicos MQTT para recibir datos de sensores:
 - Conexión WebSocket perdida
 - Problemas de cache del navegador
 - Errores de JavaScript
+- Dispositivo sin datos recientes
 
 *Soluciones:*
-1. Actualizar la página
-2. Verificar consola del navegador para errores
-3. Limpiar cache del navegador
-4. Probar con un navegador diferente
+1. Verificar el estado de conexión WebSocket en el dashboard
+2. Verificar los logs MQTT para confirmar recepción de mensajes
+3. Actualizar la página
+4. Verificar consola del navegador para errores (F12 → Console)
+5. Limpiar cache del navegador
+6. Probar con un navegador diferente
+7. Verificar que haya un dispositivo seleccionado y que esté recibiendo datos
 
 **🔴 No Puedo Acceder a la Configuración**
 

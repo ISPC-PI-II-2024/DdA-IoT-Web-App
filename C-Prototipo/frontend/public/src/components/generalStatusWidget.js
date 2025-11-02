@@ -195,8 +195,19 @@ export async function generalStatusWidget() {
   // Actualizar estado inicial
   await updateDevicesStatus();
 
-  // Actualizar automáticamente cada 30 segundos
-  const autoRefreshInterval = setInterval(updateDevicesStatus, 30000);
+  // Actualizar automáticamente cada 30 segundos (ajustado para sincronizar con lecturas)
+  // Usar un delay inicial para evitar conflictos con otros widgets
+  let isUpdating = false;
+  const autoRefreshInterval = setInterval(async () => {
+    if (!isUpdating) {
+      isUpdating = true;
+      try {
+        await updateDevicesStatus();
+      } finally {
+        isUpdating = false;
+      }
+    }
+  }, 30000);
 
   // Limpiar intervalo cuando se destruya el componente
   container.addEventListener('destroy', () => {

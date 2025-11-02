@@ -3,8 +3,10 @@
 // - Sincronización entre localStorage y API
 // - Cache de configuración
 // - Validaciones
+// - Configuraciones por perfil de usuario
 // ==========================
 import { ConfigAPI } from "../api.js";
+import { getState } from "../state/store.js";
 
 const CONFIG_KEYS = {
   VISUALIZATION: "visualization_config",
@@ -13,10 +15,20 @@ const CONFIG_KEYS = {
   USER_PREFERENCES: "user_preferences"
 };
 
+// Clave mínima para intervalo de actualización de gráficos (15 segundos)
+const MIN_CHART_REFRESH_INTERVAL = 15000;
+
 class ConfigService {
   constructor() {
     this.cache = new Map();
     this.listeners = new Map();
+  }
+
+  // Obtener clave única para el perfil del usuario actual
+  getUserConfigKey(baseKey) {
+    const state = getState();
+    const userId = state.user?.email || state.user?.name || 'guest';
+    return `${baseKey}_${userId}`;
   }
 
   // === Eventos ===
@@ -49,19 +61,22 @@ class ConfigService {
 
   // === Operaciones básicas ===
   /* eslint-disable no-undef */
-  get(key, fallback = null) {
+  get(key, fallback = null, useUserProfile = false) {
     try {
+      // Si usa perfil de usuario, obtener clave única
+      const storageKey = useUserProfile ? this.getUserConfigKey(key) : key;
+      
       // Primero buscar en cache
-      if (this.cache.has(key)) {
-        return this.cache.get(key);
+      if (this.cache.has(storageKey)) {
+        return this.cache.get(storageKey);
       }
 
       // Luego buscar en localStorage
-      const raw = localStorage.getItem(key);
+      const raw = localStorage.getItem(storageKey);
       const config = raw ? JSON.parse(raw) : fallback;
       
       // Guardar en cache
-      this.cache.set(key, config);
+      this.cache.set(storageKey, config);
       return config;
     } catch (error) {
       console.error(`Error leyendo configuración ${key}:`, error);
@@ -69,13 +84,16 @@ class ConfigService {
     }
   }
 
-  set(key, value) {
+  set(key, value, useUserProfile = false) {
     try {
+      // Si usa perfil de usuario, obtener clave única
+      const storageKey = useUserProfile ? this.getUserConfigKey(key) : key;
+      
       // Guardar en localStorage
-      localStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem(storageKey, JSON.stringify(value));
       
       // Actualizar cache
-      this.cache.set(key, value);
+      this.cache.set(storageKey, value);
       
       // Notificar cambios
       this.emitChange(key, value);
@@ -87,10 +105,11 @@ class ConfigService {
     }
   }
 
-  remove(key) {
+  remove(key, useUserProfile = false) {
     try {
-      localStorage.removeItem(key);
-      this.cache.delete(key);
+      const storageKey = useUserProfile ? this.getUserConfigKey(key) : key;
+      localStorage.removeItem(storageKey);
+      this.cache.delete(storageKey);
       this.emitChange(key, null);
       return true;
     } catch (error) {
@@ -101,15 +120,30 @@ class ConfigService {
 
   // === Configuraciones específicas ===
   getVisualizationConfig() {
-    return this.get(CONFIG_KEYS.VISUALIZATION, {
+    const config = this.get(CONFIG_KEYS.VISUALIZATION, {
       temperatureUnit: "celsius",
-      chartRefresh: 1000,
+      chartRefresh: MIN_CHART_REFRESH_INTERVAL, // Mínimo 15 segundos por defecto
       chartPoints: 60
-    });
+    }, true); // Usar perfil de usuario
+    
+    // Asegurar que chartRefresh nunca sea menor al mínimo
+    if (config.chartRefresh < MIN_CHART_REFRESH_INTERVAL) {
+      config.chartRefresh = MIN_CHART_REFRESH_INTERVAL;
+      // Actualizar automáticamente si estaba por debajo del mínimo
+      this.setVisualizationConfig(config);
+    }
+    
+    return config;
   }
 
   setVisualizationConfig(config) {
-    return this.set(CONFIG_KEYS.VISUALIZATION, config);
+    // Validar que chartRefresh sea al menos el mínimo requerido
+    if (config.chartRefresh !== undefined && config.chartRefresh < MIN_CHART_REFRESH_INTERVAL) {
+      console.warn(`chartRefresh debe ser al menos ${MIN_CHART_REFRESH_INTERVAL}ms (15s). Ajustando automáticamente.`);
+      config.chartRefresh = MIN_CHART_REFRESH_INTERVAL;
+    }
+    
+    return this.set(CONFIG_KEYS.VISUALIZATION, config, true); // Guardar por perfil de usuario
   }
 
   getAdvancedConfig() {
@@ -170,11 +204,11 @@ class ConfigService {
     return this.get(CONFIG_KEYS.NOTIFICATIONS, {
       browserNotifications: false,
       soundAlerts: false
-    });
+    }, true); // Usar perfil de usuario
   }
 
   setNotificationConfig(config) {
-    return this.set(CONFIG_KEYS.NOTIFICATIONS, config);
+    return this.set(CONFIG_KEYS.NOTIFICATIONS, config, true); // Guardar por perfil de usuario
   }
 
   // === Sincronización con servidor ===

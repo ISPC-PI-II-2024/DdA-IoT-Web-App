@@ -31,11 +31,13 @@ export async function render() {
         el("option", { value: "fahrenheit" }, "Fahrenheit (°F)")
       ),
       
-      el("label", { for: "chart_refresh" }, "Intervalo de actualización de gráficos:"),
+      el("label", { for: "chart_refresh" }, "Intervalo de actualización de gráficos (mínimo 15 segundos):"),
       el("select", { id: "chart_refresh", name: "chart_refresh" },
-        el("option", { value: "1000" }, "1 segundo"),
-        el("option", { value: "5000" }, "5 segundos"),
-        el("option", { value: "30000" }, "30 segundos")
+        el("option", { value: "15000" }, "15 segundos (mínimo)"),
+        el("option", { value: "30000" }, "30 segundos"),
+        el("option", { value: "60000" }, "1 minuto"),
+        el("option", { value: "120000" }, "2 minutos"),
+        el("option", { value: "300000" }, "5 minutos")
       ),
       
       el("label", { for: "chart_points" }, "Puntos máximos en gráficos:"),
@@ -127,19 +129,31 @@ export async function render() {
 
   // Funciones para manejar la configuración usando ConfigService
   window.saveVisualizationConfig = async function() {
+    const chartRefreshValue = parseInt(document.getElementById("chart_refresh").value);
+    const MIN_INTERVAL = 15000; // 15 segundos mínimo
+    
+    // Validar que el intervalo sea al menos 15 segundos
+    if (chartRefreshValue < MIN_INTERVAL) {
+      alert(`El intervalo de actualización debe ser al menos 15 segundos (${MIN_INTERVAL}ms). Se ajustará automáticamente.`);
+      document.getElementById("chart_refresh").value = MIN_INTERVAL;
+    }
+    
     const config = {
       temperatureUnit: document.getElementById("temperature_unit").value,
-      chartRefresh: parseInt(document.getElementById("chart_refresh").value),
+      chartRefresh: Math.max(chartRefreshValue, MIN_INTERVAL), // Asegurar mínimo
       chartPoints: parseInt(document.getElementById("chart_points").value)
     };
     
     try {
-      // Guardar usando ConfigService
+      // Guardar usando ConfigService (ya guarda por perfil automáticamente)
       const success = configService.setVisualizationConfig(config);
       
       if (success) {
-        alert("Configuración guardada exitosamente");
-        console.log("Configuración de visualización actualizada:", config);
+        alert("Configuración guardada exitosamente para tu perfil");
+        console.log("Configuración de visualización actualizada (por perfil):", config);
+        
+        // Disparar evento personalizado para que otros componentes se actualicen
+        window.dispatchEvent(new CustomEvent('visualizationConfigChanged', { detail: config }));
       } else {
         throw new Error("Error guardando configuración");
       }
@@ -173,17 +187,20 @@ export async function render() {
   // Cargar configuración existente usando ConfigService
   const loadExistingConfig = () => {
     try {
-      // Configuración de visualización
+      // Configuración de visualización (carga por perfil automáticamente)
       const vizConfig = configService.getVisualizationConfig();
       document.getElementById("temperature_unit").value = vizConfig.temperatureUnit || "celsius";
-      document.getElementById("chart_refresh").value = vizConfig.chartRefresh || 1000;
+      // Asegurar que el valor mostrado sea al menos 15 segundos
+      const chartRefreshValue = Math.max(vizConfig.chartRefresh || 15000, 15000);
+      document.getElementById("chart_refresh").value = chartRefreshValue;
       document.getElementById("chart_points").value = vizConfig.chartPoints || 60;
       
-      // Configuración de notificaciones
+      // Configuración de notificaciones (carga por perfil automáticamente)
       const notifConfig = configService.getNotificationConfig();
       document.getElementById("browser_notifications").checked = notifConfig.browserNotifications || false;
       document.getElementById("sound_alerts").checked = notifConfig.soundAlerts || false;
       
+      console.log("Configuración cargada para el perfil actual:", { vizConfig, notifConfig });
     } catch (error) {
       console.error("Error cargando configuración:", error);
     }

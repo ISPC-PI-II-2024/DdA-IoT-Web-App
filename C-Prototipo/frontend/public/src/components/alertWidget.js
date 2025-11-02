@@ -13,14 +13,17 @@ export function alertWidget() {
     style: "margin-bottom: 20px;"
   });
 
+  // Crear referencia al contador de alertas
+  const alertCountSpan = el("span", {
+    id: "alert-count",
+    style: "background: var(--color-error); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;"
+  }, "0");
+
   const title = el("h3", {
     style: "margin-bottom: 15px; display: flex; align-items: center; gap: 10px;"
   },
     el("span", {}, "🚨 Alertas Activas"),
-    el("span", {
-      id: "alert-count",
-      style: "background: var(--color-error); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;"
-    }, "0")
+    alertCountSpan
   );
 
   const alertsList = el("div", {
@@ -43,11 +46,11 @@ export function alertWidget() {
     
     if (alerts.length === 0) {
       alertsList.appendChild(noAlerts);
-      document.getElementById("alert-count").textContent = "0";
+      alertCountSpan.textContent = "0";
       return;
     }
     
-    document.getElementById("alert-count").textContent = alerts.length;
+    alertCountSpan.textContent = alerts.length;
     
     // Agrupar por tipo
     const alertsByType = {};

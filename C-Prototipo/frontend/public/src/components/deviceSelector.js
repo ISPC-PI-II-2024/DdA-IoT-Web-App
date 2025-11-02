@@ -26,9 +26,16 @@ export async function deviceSelectorWidget() {
   });
 
   // Título
+  const titleContainer = el("div", {});
   const title = el("h3", {
     style: "margin-bottom: 10px;"
   }, "Dispositivo Seleccionado");
+  const subtitle = el("p", {
+    style: "font-size: 0.85em; color: #666; margin-bottom: 8px;"
+  }, "Selecciona un Endpoint o Sensor para ver sus lecturas");
+  
+  titleContainer.appendChild(title);
+  titleContainer.appendChild(subtitle);
 
   // Input de búsqueda
   const searchInput = el("input", {
@@ -51,7 +58,7 @@ export async function deviceSelectorWidget() {
     style: "max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; background: white; display: none; position: absolute; width: 100%; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"
   });
 
-  container.appendChild(title);
+  container.appendChild(titleContainer);
   container.appendChild(searchInput);
   container.appendChild(searchIcon);
   container.appendChild(dropdown);
@@ -61,10 +68,15 @@ export async function deviceSelectorWidget() {
     dropdown.innerHTML = '';
     const filter = filterText.toLowerCase();
 
-    // Si no hay filtro, mostrar todos los dispositivos
+    // Filtrar solo endpoints y sensores (NO gateways)
+    const selectableDevices = currentDevices.filter(device => 
+      device.tipo === 'endpoint' || device.tipo === 'sensor'
+    );
+
+    // Si no hay filtro, mostrar todos los dispositivos seleccionables
     // Si hay filtro, mostrar solo los que coinciden
-    const filteredDevices = !filter ? currentDevices : 
-                           currentDevices.filter(device => {
+    const filteredDevices = !filter ? selectableDevices : 
+                           selectableDevices.filter(device => {
                              const deviceName = `${device.nombre} ${device.id_dispositivo}`.toLowerCase();
                              return deviceName.includes(filter);
                            });

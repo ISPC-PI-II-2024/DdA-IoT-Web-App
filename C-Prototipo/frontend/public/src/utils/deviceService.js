@@ -11,6 +11,13 @@ class DeviceService {
   constructor() {
     this.isLoading = false;
     this.loadingPromises = new Map();
+    // Sistema de batching para optimizar consultas
+    this.batchQueues = new Map(); // tipo -> array de {deviceId, resolve, reject, limit}
+    this.batchTimers = new Map(); // tipo -> timer
+    this.BATCH_DELAY = 300; // Esperar 300ms antes de ejecutar batch
+    this.BATCH_SIZE = 5; // Máximo 5 dispositivos por batch
+    this.MAX_CONCURRENT = 3; // Máximo 3 batches simultáneos
+    this.activeBatches = 0;
   }
 
   /**
@@ -143,7 +150,7 @@ class DeviceService {
   }
 
   /**
-   * Obtiene datos de sensores de un dispositivo con cache
+   * Obtiene datos de sensores de un dispositivo con cache y batching
    * @param {string} deviceId - ID del dispositivo
    * @param {number} limit - Límite de registros
    * @returns {Promise<Array>} Datos de sensores
@@ -151,61 +158,191 @@ class DeviceService {
   async getDeviceSensorData(deviceId, limit = 50) {
     const cacheKey = `${CACHE_KEYS.DEVICE_SENSOR_DATA}_${deviceId}_${limit}`;
     
-    // Verificar cache
+    // Verificar cache primero
     const cached = cacheService.get(cacheKey);
     if (cached) {
       console.log(`[CACHE] Datos de sensores del dispositivo ${deviceId} obtenidos del cache`);
       return cached;
     }
 
-    console.log(`[API] Cargando datos de sensores del dispositivo ${deviceId}...`);
+    // Usar batching si hay múltiples peticiones pendientes
+    return this._batchRequest('sensor_data', deviceId, limit, async () => {
+      console.log(`[API] Cargando datos de sensores del dispositivo ${deviceId}...`);
 
-    try {
-      // Timeout para evitar que se quede colgado
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout: El servidor no responde')), 6000);
+      try {
+        // Timeout para evitar que se quede colgado
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Timeout: El servidor no responde')), 6000);
+        });
+
+        const apiPromise = DevicesAPI.getDeviceSensorData(deviceId, limit);
+        const response = await Promise.race([apiPromise, timeoutPromise]);
+
+        if (response.success) {
+          const sensorData = response.data;
+          
+          // Cachear los datos (TTL más corto para datos dinámicos)
+          cacheService.set(cacheKey, sensorData, CACHE_TTL.DEVICE_SENSOR_DATA);
+          
+          console.log(`[API] ${sensorData.length} registros de sensores cargados y cacheados`);
+          return sensorData;
+        } else {
+          throw new Error("Error en respuesta del servidor");
+        }
+      } catch (error) {
+        console.error(`[ERROR] Error cargando datos de sensores del dispositivo ${deviceId}:`, error);
+        
+        // Fallback: devolver datos de ejemplo
+        const fallbackData = [
+          {
+            id: 1,
+            tipo_sensor: "temperatura",
+            valor: "22.5",
+            unidad: "°C",
+            timestamp: new Date().toISOString(),
+            metadatos: {}
+          },
+          {
+            id: 2,
+            tipo_sensor: "humedad",
+            valor: "65.2",
+            unidad: "%",
+            timestamp: new Date(Date.now() - 60000).toISOString(),
+            metadatos: {}
+          }
+        ];
+        
+        console.log(`[FALLBACK] Usando datos de fallback para sensores del dispositivo ${deviceId}`);
+        cacheService.set(cacheKey, fallbackData, 60000);
+        return fallbackData;
+      }
+    });
+  }
+
+  /**
+   * Sistema de batching para agrupar peticiones similares
+   * @private
+   */
+  _batchRequest(type, deviceId, limit, requestFn) {
+    return new Promise((resolve, reject) => {
+      const batchKey = `${type}_${deviceId}_${limit}`;
+      
+      // Si ya existe una petición para este dispositivo exacto, reutilizar
+      if (this.loadingPromises.has(batchKey)) {
+        this.loadingPromises.get(batchKey).then(resolve).catch(reject);
+        return;
+      }
+
+      // Inicializar cola si no existe
+      if (!this.batchQueues.has(type)) {
+        this.batchQueues.set(type, []);
+      }
+
+      const queue = this.batchQueues.get(type);
+      
+      // Agregar a la cola
+      queue.push({
+        deviceId,
+        limit,
+        requestFn,
+        resolve,
+        reject,
+        batchKey
       });
 
-      const apiPromise = DevicesAPI.getDeviceSensorData(deviceId, limit);
-      const response = await Promise.race([apiPromise, timeoutPromise]);
+      // Programar ejecución del batch
+      this._scheduleBatch(type);
+    });
+  }
 
-      if (response.success) {
-        const sensorData = response.data;
-        
-        // Cachear los datos (TTL más corto para datos dinámicos)
-        cacheService.set(cacheKey, sensorData, CACHE_TTL.DEVICE_SENSOR_DATA);
-        
-        console.log(`[API] ${sensorData.length} registros de sensores cargados y cacheados`);
-        return sensorData;
-      } else {
-        throw new Error("Error en respuesta del servidor");
+  /**
+   * Programa la ejecución de un batch
+   * @private
+   */
+  _scheduleBatch(type) {
+    // Limpiar timer anterior si existe
+    if (this.batchTimers.has(type)) {
+      clearTimeout(this.batchTimers.get(type));
+    }
+
+    const queue = this.batchQueues.get(type);
+    if (!queue || queue.length === 0) return;
+
+    // Si hay suficiente en la cola, ejecutar inmediatamente
+    if (queue.length >= this.BATCH_SIZE) {
+      this._executeBatch(type);
+      return;
+    }
+
+    // Programar ejecución después del delay
+    const timer = setTimeout(() => {
+      this._executeBatch(type);
+    }, this.BATCH_DELAY);
+
+    this.batchTimers.set(type, timer);
+  }
+
+  /**
+   * Ejecuta un batch de peticiones
+   * @private
+   */
+  async _executeBatch(type) {
+    const queue = this.batchQueues.get(type);
+    if (!queue || queue.length === 0) return;
+
+    // Limpiar timer
+    if (this.batchTimers.has(type)) {
+      clearTimeout(this.batchTimers.get(type));
+      this.batchTimers.delete(type);
+    }
+
+    // Obtener items a procesar (máximo BATCH_SIZE)
+    const itemsToProcess = queue.splice(0, this.BATCH_SIZE);
+
+    // Ejecutar items con limitación de concurrencia
+    const maxConcurrent = Math.min(this.MAX_CONCURRENT, itemsToProcess.length);
+    const batches = [];
+    
+    // Dividir en sub-batches para control de concurrencia
+    for (let i = 0; i < itemsToProcess.length; i += maxConcurrent) {
+      const batch = itemsToProcess.slice(i, i + maxConcurrent);
+      batches.push(batch);
+    }
+
+    // Ejecutar cada sub-batch
+    for (const batch of batches) {
+      // Ejecutar peticiones del batch en paralelo
+      const promises = batch.map(item => {
+        // Guardar promesa para reutilización
+        const promise = item.requestFn()
+          .then(result => {
+            item.resolve(result);
+            return result;
+          })
+          .catch(error => {
+            item.reject(error);
+            throw error;
+          })
+          .finally(() => {
+            this.loadingPromises.delete(item.batchKey);
+          });
+
+        this.loadingPromises.set(item.batchKey, promise);
+        return promise;
+      });
+
+      // Esperar a que termine este batch antes del siguiente (pequeño delay)
+      await Promise.allSettled(promises);
+      
+      // Pequeño delay entre batches para no saturar el servidor
+      if (batches.indexOf(batch) < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-    } catch (error) {
-      console.error(`[ERROR] Error cargando datos de sensores del dispositivo ${deviceId}:`, error);
-      
-      // Fallback: devolver datos de ejemplo
-      const fallbackData = [
-        {
-          id: 1,
-          tipo_sensor: "temperatura",
-          valor: "22.5",
-          unidad: "°C",
-          timestamp: new Date().toISOString(),
-          metadatos: {}
-        },
-        {
-          id: 2,
-          tipo_sensor: "humedad",
-          valor: "65.2",
-          unidad: "%",
-          timestamp: new Date(Date.now() - 60000).toISOString(),
-          metadatos: {}
-        }
-      ];
-      
-      console.log(`[FALLBACK] Usando datos de fallback para sensores del dispositivo ${deviceId}`);
-      cacheService.set(cacheKey, fallbackData, 60000);
-      return fallbackData;
+    }
+
+    // Si quedan items en la cola, programar siguiente ejecución
+    if (queue.length > 0) {
+      this._scheduleBatch(type);
     }
   }
 

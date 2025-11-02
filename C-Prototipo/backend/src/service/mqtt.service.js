@@ -543,7 +543,7 @@ class MQTTService {
     
     if (data.endpoints && Array.isArray(data.endpoints)) {
       data.endpoints.forEach(endpoint => {
-        const endpointId = endpoint.id_endpoint;
+        const endpointId = endpoint.id;
         
         if (endpoint.sensores && Array.isArray(endpoint.sensores)) {
           endpoint.sensores.forEach(sensor => {

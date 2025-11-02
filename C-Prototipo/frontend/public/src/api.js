@@ -52,20 +52,43 @@ export async function initSession() {
   return false;
 }
 
-// Rate limiting simple
+// Rate limiting simple con cache compartido
 const requestQueue = new Map(); // path -> { lastRequest, count }
+const responseCache = new Map(); // path -> { data, timestamp, ttl }
 
-async function request(path, { method = "GET", body, auth = false } = {}) {
-  // Rate limiting - máximo 1 request por segundo por endpoint
+// Limpiar cache automáticamente cada 5 minutos
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, cached] of responseCache.entries()) {
+    if (now - cached.timestamp > cached.ttl) {
+      responseCache.delete(key);
+    }
+  }
+}, 300000); // 5 minutos
+
+async function request(path, { method = "GET", body, auth = false, cache = false, cacheTTL = 30000 } = {}) {
+  // Para GET requests, verificar cache primero si está habilitado
+  if (method === "GET" && cache) {
+    const cacheKey = `${method}:${path}`;
+    const cached = responseCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < cached.ttl) {
+      return Promise.resolve(cached.data);
+    }
+  }
+
+  // Rate limiting - máximo 2 requests por segundo por endpoint
   const now = Date.now();
   const queueKey = `${method}:${path}`;
   const lastRequest = requestQueue.get(queueKey);
   
-  if (lastRequest && now - lastRequest.lastRequest < 1000) {
+  if (lastRequest && now - lastRequest.lastRequest < 500) { // 500ms = 2 por segundo
     lastRequest.count++;
-    if (lastRequest.count > 3) {
+    if (lastRequest.count > 5) { // Aumentar límite a 5
       console.warn(`[RATE-LIMIT] demasiadas requests a ${path}`);
-      return Promise.reject(new Error("Rate limit exceeded"));
+      // En lugar de rechazar, esperar un poco
+      await new Promise(resolve => setTimeout(resolve, 500));
+      // Resetear contador después de esperar
+      requestQueue.set(queueKey, { lastRequest: Date.now(), count: 1 });
     }
   } else {
     requestQueue.set(queueKey, { lastRequest: now, count: 1 });
@@ -91,6 +114,16 @@ async function request(path, { method = "GET", body, auth = false } = {}) {
     if (!res.ok) {
       console.error(`[API-ERROR] [${res.status}]:`, path, data);
       throw Object.assign(new Error("API error"), { status: res.status, data });
+    }
+    
+    // Guardar en cache si está habilitado y es GET
+    if (method === "GET" && cache) {
+      const cacheKey = `${method}:${path}`;
+      responseCache.set(cacheKey, {
+        data,
+        timestamp: Date.now(),
+        ttl: cacheTTL
+      });
     }
     
     return data;
@@ -217,7 +250,8 @@ export const GatewayAPI = {
   
   // Obtener estado completo del sistema
   getSystemStatus() {
-    return request("/status", { auth: true });
+    // Usar cache de 5 segundos para evitar rate limits cuando múltiples widgets lo llaman
+    return request("/status", { auth: true, cache: true, cacheTTL: 5000 });
   },
   
   // Obtener umbrales actuales

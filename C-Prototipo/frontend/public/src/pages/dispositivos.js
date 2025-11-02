@@ -219,41 +219,78 @@ export async function render() {
   );
 
   // Función para organizar dispositivos jerárquicamente
+  // Estructura: Gateway → Endpoints → Sensores
   function organizeDevicesHierarchy(devices) {
     const gateways = [];
     const endpointsByGateway = {};
     const sensorsByEndpoint = {};
     
-    console.log('[DISPOSITIVOS] Organizando', devices.length, 'dispositivos');
+    console.log('[DISPOSITIVOS] Organizando', devices.length, 'dispositivos en jerarquía');
     
-    // Separar dispositivos por tipo
+    // Paso 1: Identificar y ordenar gateways
     devices.forEach(device => {
       if (device.tipo === 'gateway') {
         gateways.push(device);
-        console.log('[DISPOSITIVOS] Gateway encontrado:', device.id_dispositivo);
-      } else if (device.tipo === 'endpoint') {
-        const gatewayId = device.id_gateway || 'unknown';
-        if (!endpointsByGateway[gatewayId]) {
-          endpointsByGateway[gatewayId] = [];
-        }
-        endpointsByGateway[gatewayId].push(device);
-        console.log('[DISPOSITIVOS] Endpoint encontrado:', device.id_dispositivo, 'para gateway:', gatewayId);
-      } else if (device.tipo === 'sensor') {
-        const endpointId = device.id_endpoint || 'unknown';
-        if (!sensorsByEndpoint[endpointId]) {
-          sensorsByEndpoint[endpointId] = [];
-        }
-        sensorsByEndpoint[endpointId].push(device);
-        console.log('[DISPOSITIVOS] Sensor encontrado:', device.id_dispositivo, 'para endpoint:', endpointId);
-      } else {
-        console.log('[DISPOSITIVOS] Dispositivo desconocido:', device.tipo, device.id_dispositivo);
+        endpointsByGateway[device.id_dispositivo] = [];
+        console.log('[DISPOSITIVOS] ✅ Gateway:', device.id_dispositivo);
       }
     });
     
-    console.log('[DISPOSITIVOS] Resultado:', {
+    // Paso 2: Asignar endpoints a sus gateways correspondientes
+    devices.forEach(device => {
+      if (device.tipo === 'endpoint') {
+        const gatewayId = device.id_gateway || null;
+        
+        if (gatewayId && endpointsByGateway.hasOwnProperty(gatewayId)) {
+          endpointsByGateway[gatewayId].push(device);
+          // Inicializar array de sensores para este endpoint
+          sensorsByEndpoint[device.id_dispositivo] = [];
+          console.log('[DISPOSITIVOS]   └─ Endpoint:', device.id_dispositivo, '→ Gateway:', gatewayId);
+        } else {
+          console.warn('[DISPOSITIVOS] ⚠️ Endpoint sin gateway válido:', device.id_dispositivo, '→ gateway_id:', gatewayId);
+          // Crear entrada para endpoints huérfanos
+          if (!endpointsByGateway['_orphan']) {
+            endpointsByGateway['_orphan'] = [];
+          }
+          endpointsByGateway['_orphan'].push(device);
+          sensorsByEndpoint[device.id_dispositivo] = [];
+        }
+      }
+    });
+    
+    // Paso 3: Asignar sensores a sus endpoints correspondientes
+    devices.forEach(device => {
+      if (device.tipo === 'sensor') {
+        const endpointId = device.id_endpoint || null;
+        
+        if (endpointId) {
+          if (!sensorsByEndpoint[endpointId]) {
+            sensorsByEndpoint[endpointId] = [];
+          }
+          sensorsByEndpoint[endpointId].push(device);
+          console.log('[DISPOSITIVOS]     └─ Sensor:', device.id_dispositivo, '→ Endpoint:', endpointId);
+        } else {
+          console.warn('[DISPOSITIVOS] ⚠️ Sensor sin endpoint válido:', device.id_dispositivo);
+          // Crear entrada para sensores huérfanos
+          if (!sensorsByEndpoint['_orphan']) {
+            sensorsByEndpoint['_orphan'] = [];
+          }
+          sensorsByEndpoint['_orphan'].push(device);
+        }
+      }
+    });
+    
+    // Estadísticas de la jerarquía
+    const totalEndpoints = Object.values(endpointsByGateway).flat().length;
+    const totalSensors = Object.values(sensorsByEndpoint).flat().length;
+    
+    console.log('[DISPOSITIVOS] 📊 Jerarquía organizada:', {
       gateways: gateways.length,
-      endpoints: Object.keys(endpointsByGateway).length,
-      sensors: Object.keys(sensorsByEndpoint).length
+      totalEndpoints: totalEndpoints,
+      totalSensors: totalSensors,
+      endpointsPorGateway: Object.fromEntries(
+        Object.entries(endpointsByGateway).map(([gw, eps]) => [gw, eps.length])
+      )
     });
     
     return { gateways, endpointsByGateway, sensorsByEndpoint };
@@ -401,101 +438,188 @@ export async function render() {
 
         mainContainer.appendChild(statsCard);
 
-        // Crear estructura jerárquica
+        // Crear estructura jerárquica mejorada: Gateway → Endpoints → Sensores
         gateways.forEach(gateway => {
           const gatewayColor = getDeviceStatusColor(gateway);
-          const gatewayCard = el("div", { class: "card", style: "border-left: 4px solid " + gatewayColor },
-            el("div", { style: "display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;" },
-              el("div", {},
-                el("h3", { style: "margin: 0; color: #333; display: flex; align-items: center; gap: 10px;" },
-                  el("span", { style: `width: 12px; height: 12px; border-radius: 50%; background-color: ${gatewayColor}; box-shadow: 0 0 8px ${gatewayColor}40;` }),
-                  `Gateway ${gateway.id_dispositivo}`,
-                  el("span", { style: "font-size: 0.7em; color: #666; font-weight: normal;" }, `(${gateway.nombre})`)
+          const endpoints = endpointsByGateway[gateway.id_dispositivo] || [];
+          const totalSensorsForGateway = endpoints.reduce((total, ep) => {
+            return total + (sensorsByEndpoint[ep.id_dispositivo]?.length || 0);
+          }, 0);
+          
+          // Card principal del Gateway
+          const gatewayCard = el("div", { 
+            class: "card gateway-card",
+            style: `border-left: 5px solid ${gatewayColor}; background: linear-gradient(to right, ${gatewayColor}08, transparent); margin-bottom: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);`
+          },
+            // Header del Gateway
+            el("div", { style: "display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #e8e8e8;" },
+              el("div", { style: "flex: 1;" },
+                el("div", { style: "display: flex; align-items: center; gap: 12px; margin-bottom: 8px;" },
+                  el("span", { style: `width: 16px; height: 16px; border-radius: 50%; background-color: ${gatewayColor}; box-shadow: 0 0 10px ${gatewayColor}60; animation: pulse 2s infinite;` }),
+                  el("h3", { style: "margin: 0; color: #1a1a1a; font-size: 1.3em; font-weight: 600;" },
+                    `🌐 Gateway ${gateway.id_dispositivo}`,
+                    el("span", { style: "font-size: 0.7em; color: #666; font-weight: normal; margin-left: 8px;" }, gateway.nombre || '')
+                  )
                 ),
-                el("p", { style: "margin: 5px 0 0 0; color: #666; font-size: 0.9em;" }, `📍 ${gateway.ubicacion || 'Sin ubicación'}`)
+                el("div", { style: "display: flex; gap: 20px; flex-wrap: wrap; margin-top: 8px;" },
+                  el("p", { style: "margin: 0; color: #666; font-size: 0.9em; display: flex; align-items: center; gap: 6px;" },
+                    el("span", {}, "📍"),
+                    gateway.ubicacion || 'Sin ubicación'
+                  ),
+                  el("p", { style: "margin: 0; color: #666; font-size: 0.9em; display: flex; align-items: center; gap: 6px;" },
+                    el("span", {}, "🔗"),
+                    `${endpoints.length} endpoint${endpoints.length !== 1 ? 's' : ''}`
+                  ),
+                  el("p", { style: "margin: 0; color: #666; font-size: 0.9em; display: flex; align-items: center; gap: 6px;" },
+                    el("span", {}, "📡"),
+                    `${totalSensorsForGateway} sensor${totalSensorsForGateway !== 1 ? 'es' : ''}`
+                  )
+                )
               ),
-              el("div", { style: "padding: 5px 15px; border-radius: 20px; background: " + gatewayColor + "20; color: " + gatewayColor + "; font-weight: bold; font-size: 0.8em;" }, 
-                gateway.estado === 'en_linea' ? 'En Línea' : gateway.estado === 'fuera_linea' ? 'Fuera de Línea' : 'Error'
+              el("div", { 
+                style: `padding: 8px 20px; border-radius: 25px; background: ${gatewayColor}15; color: ${gatewayColor}; font-weight: bold; font-size: 0.85em; border: 2px solid ${gatewayColor}40; white-space: nowrap;` 
+              }, 
+                gateway.estado === 'en_linea' ? '● En Línea' : gateway.estado === 'fuera_linea' ? '○ Fuera de Línea' : '⚠ Error'
               )
             )
           );
 
-          const endpoints = endpointsByGateway[gateway.id_dispositivo] || [];
+          // Contenedor de Endpoints
           if (endpoints.length > 0) {
-            const endpointsContainer = el("div", { style: "margin-top: 15px; padding-left: 20px; border-left: 2px solid #e0e0e0;" });
+            const endpointsContainer = el("div", { 
+              style: "margin-top: 10px; padding-left: 30px; position: relative;",
+              class: "endpoints-container"
+            },
+              // Línea vertical conectora
+              el("div", { 
+                style: `position: absolute; left: 15px; top: 0; bottom: 0; width: 3px; background: linear-gradient(to bottom, ${gatewayColor}40, transparent); border-radius: 2px;` 
+              })
+            );
             
-            endpoints.forEach(endpoint => {
+            endpoints.forEach((endpoint, epIndex) => {
               const endpointColor = getDeviceStatusColor(endpoint);
+              const sensors = sensorsByEndpoint[endpoint.id_dispositivo] || [];
+              const isLastEndpoint = epIndex === endpoints.length - 1;
+              
+              // Card del Endpoint
               const endpointCard = el("div", { 
-                class: "card",
-                style: "margin-bottom: 15px; padding: 15px; border-left: 3px solid " + endpointColor + "; background: #fafafa;"
+                class: "card endpoint-card",
+                style: `margin-bottom: 20px; padding: 18px; border-left: 4px solid ${endpointColor}; background: #fafafa; border-radius: 8px; position: relative; box-shadow: 0 1px 4px rgba(0,0,0,0.05);`
               },
-                el("div", { style: "display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;" },
-                  el("div", {},
-                    el("h4", { style: "margin: 0; color: #333; display: flex; align-items: center; gap: 8px;" },
-                      el("span", { style: `width: 10px; height: 10px; border-radius: 50%; background-color: ${endpointColor};` }),
-                      `Endpoint ${endpoint.id_dispositivo}`,
-                      el("span", { style: "font-size: 0.75em; color: #666; font-weight: normal;" }, `(${endpoint.nombre})`)
+                // Header del Endpoint
+                el("div", { style: "display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #e8e8e8;" },
+                  el("div", { style: "flex: 1;" },
+                    el("div", { style: "display: flex; align-items: center; gap: 10px; margin-bottom: 6px;" },
+                      // Línea horizontal conectora
+                      el("div", { 
+                        style: `width: 20px; height: 2px; background: ${gatewayColor}60; position: relative;` 
+                      },
+                        el("div", { 
+                          style: `position: absolute; right: -8px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: ${endpointColor}; border: 2px solid white; box-shadow: 0 0 6px ${endpointColor}60;` 
+                        })
+                      ),
+                      el("h4", { style: "margin: 0; color: #2a2a2a; font-size: 1.1em; font-weight: 600; display: flex; align-items: center; gap: 8px;" },
+                        el("span", {}, "🔌"),
+                        `Endpoint ${endpoint.id_dispositivo}`,
+                        el("span", { style: "font-size: 0.75em; color: #888; font-weight: normal; margin-left: 6px;" }, endpoint.nombre ? `(${endpoint.nombre})` : '')
+                      )
                     ),
-                    el("p", { style: "margin: 5px 0 0 0; color: #666; font-size: 0.85em;" }, `📍 ${endpoint.ubicacion || 'Sin ubicación'}`)
+                    el("div", { style: "display: flex; gap: 16px; flex-wrap: wrap; margin-left: 30px;" },
+                      el("p", { style: "margin: 0; color: #666; font-size: 0.85em;" }, `📍 ${endpoint.ubicacion || 'Sin ubicación'}`),
+                      el("p", { style: "margin: 0; color: #666; font-size: 0.85em; font-weight: 500;" },
+                        `📡 ${sensors.length} sensor${sensors.length !== 1 ? 'es' : ''}`
+                      )
+                    )
                   ),
-                  el("div", { style: "padding: 3px 10px; border-radius: 15px; background: " + endpointColor + "20; color: " + endpointColor + "; font-weight: bold; font-size: 0.75em;" }, 
-                    endpoint.estado === 'en_linea' ? 'En Línea' : 'Fuera de Línea'
+                  el("div", { 
+                    style: `padding: 4px 12px; border-radius: 18px; background: ${endpointColor}15; color: ${endpointColor}; font-weight: 600; font-size: 0.75em; border: 1px solid ${endpointColor}30;` 
+                  }, 
+                    endpoint.estado === 'en_linea' ? '● En Línea' : endpoint.estado === 'fuera_linea' ? '○ Fuera de Línea' : '⚠ Error'
                   )
                 )
               );
 
-              // Acción: ver histórico del endpoint
+              // Botón para ver histórico del endpoint
               try {
-                endpointCard.appendChild(el('div', { style: 'margin-top:6px;' },
+                endpointCard.appendChild(el('div', { style: 'margin-top: 8px; margin-left: 30px;' },
                   el('button', {
                     class: 'btn btn-sm',
+                    style: 'background: #2196F3; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85em;',
                     onclick: async () => { await renderHistoryForDevice(endpoint.id_dispositivo, endpointCard); }
                   }, '📈 Ver Histórico')
                 ));
               } catch {}
 
-              const sensors = sensorsByEndpoint[endpoint.id_dispositivo] || [];
+              // Contenedor de Sensores
               if (sensors.length > 0) {
                 try {
-                  const sensorsList = el("div", { style: "margin-top: 10px; padding-left: 15px; border-left: 2px solid #e8e8e8;" });
+                  const sensorsContainer = el("div", { 
+                    style: "margin-top: 15px; padding-left: 35px; position: relative;",
+                    class: "sensors-container"
+                  },
+                    // Línea vertical conectora de sensores
+                    el("div", { 
+                      style: `position: absolute; left: 20px; top: 0; bottom: ${isLastEndpoint ? '20px' : '0'}; width: 2px; background: linear-gradient(to bottom, ${endpointColor}30, transparent);` 
+                    })
+                  );
                   
-                  sensors.forEach(sensor => {
+                  sensors.forEach((sensor, sensorIndex) => {
                     try {
                       const sensorColor = getDeviceStatusColor(sensor);
                       const sensorName = (sensor.nombre ? String(sensor.nombre) : `Sensor ${sensor.id_dispositivo || 'unknown'}`).trim();
+                      const isLastSensor = sensorIndex === sensors.length - 1;
+                      
                       const sensorItem = el("div", {
-                        style: `padding: 8px 12px; margin-bottom: 5px; background: white; border-left: 2px solid ${sensorColor}; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;`
+                        class: "sensor-item",
+                        style: `padding: 12px 15px; margin-bottom: ${isLastSensor ? '0' : '8px'}; background: white; border-left: 3px solid ${sensorColor}; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative;`
                       },
-                        el("div", { style: "display: flex; align-items: center; gap: 8px; font-size: 0.9em; color: #555;" },
-                          el("span", { style: `width: 8px; height: 8px; border-radius: 50%; background-color: ${sensorColor};` }),
-                          sensorName
+                        // Línea horizontal conectora de sensor
+                        el("div", { 
+                          style: `position: absolute; left: -35px; top: 50%; width: 15px; height: 2px; background: ${endpointColor}40;` 
+                        },
+                          el("div", { 
+                            style: `position: absolute; right: -6px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: ${sensorColor}; border: 2px solid white; box-shadow: 0 0 4px ${sensorColor}50;` 
+                          })
                         ),
-                        el('div', { style: 'display:flex; align-items:center; gap:8px;' },
-                          el("span", { style: "padding: 3px 8px; border-radius: 12px; background: " + sensorColor + "20; color: " + sensorColor + "; font-weight: bold; font-size: 0.75em;" },
-                            sensor.estado === 'en_linea' ? '●' : '○'
+                        el("div", { style: "display: flex; align-items: center; gap: 10px; font-size: 0.9em; color: #444; flex: 1;" },
+                          el("span", { style: `width: 10px; height: 10px; border-radius: 50%; background-color: ${sensorColor}; box-shadow: 0 0 6px ${sensorColor}40;` }),
+                          el("span", { style: "font-weight: 500;" }, "🌡️"),
+                          el("span", { style: "font-weight: 500;" }, sensorName),
+                          el("span", { style: "font-size: 0.85em; color: #999; margin-left: 8px;" }, sensor.id_dispositivo)
+                        ),
+                        el('div', { style: 'display:flex; align-items:center; gap:10px;' },
+                          el("span", { 
+                            style: `padding: 4px 10px; border-radius: 12px; background: ${sensorColor}15; color: ${sensorColor}; font-weight: 600; font-size: 0.75em; border: 1px solid ${sensorColor}25;` 
+                          },
+                            sensor.estado === 'en_linea' ? '● Activo' : '○ Inactivo'
                           ),
-                          el('button', { class: 'btn btn-xs', onclick: async () => { await renderHistoryForDevice(sensor.id_dispositivo, sensorItem); } }, '📈 Histórico')
+                          el('button', { 
+                            class: 'btn btn-xs', 
+                            style: 'padding: 4px 10px; font-size: 0.75em;',
+                            onclick: async () => { await renderHistoryForDevice(sensor.id_dispositivo, sensorItem); } 
+                          }, '📈 Histórico')
                         )
                       );
                       
-                      if (sensorsList && sensorItem instanceof Node) {
-                        sensorsList.appendChild(sensorItem);
+                      if (sensorsContainer && sensorItem instanceof Node) {
+                        sensorsContainer.appendChild(sensorItem);
                       }
                     } catch (sensorError) {
-                      console.error('Error creating sensor item:', sensorError, {
-                        sensor,
-                        sensorId: sensor.id_dispositivo
-                      });
+                      console.error('Error creating sensor item:', sensorError, { sensor, sensorId: sensor.id_dispositivo });
                     }
                   });
                   
-                  if (endpointCard && sensorsList instanceof Node && sensorsList.children.length > 0) {
-                    endpointCard.appendChild(sensorsList);
+                  if (endpointCard && sensorsContainer instanceof Node && sensorsContainer.children.length > 0) {
+                    endpointCard.appendChild(sensorsContainer);
                   }
                 } catch (sensorsListError) {
                   console.error('Error creating sensors list:', sensorsListError);
                 }
+              } else {
+                // Mostrar mensaje si no hay sensores
+                endpointCard.appendChild(el('div', {
+                  style: 'margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 6px; text-align: center; color: #999; font-size: 0.85em; margin-left: 30px;'
+                }, '📭 Sin sensores asociados'));
               }
               
               try {
@@ -514,6 +638,11 @@ export async function render() {
             } catch (gatewayAppendError) {
               console.error('Error appending endpoints container:', gatewayAppendError);
             }
+          } else {
+            // Mostrar mensaje si no hay endpoints
+            gatewayCard.appendChild(el('div', {
+              style: 'margin-top: 15px; padding: 20px; background: #f9f9f9; border-radius: 8px; text-align: center; color: #999;'
+            }, '📭 Este gateway no tiene endpoints asociados'));
           }
           
           try {
@@ -593,13 +722,45 @@ export async function render() {
   return page;
 }
 
-// Agregar estilos CSS para la animación de pulso
+// Agregar estilos CSS para la animación de pulso y mejoras visuales
 const style = document.createElement('style');
 style.textContent = `
   @keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
+    0%, 100% { 
+      opacity: 1; 
+      transform: scale(1);
+    }
+    50% { 
+      opacity: 0.7; 
+      transform: scale(1.1);
+    }
+  }
+  
+  .gateway-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .gateway-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  }
+  
+  .endpoint-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .endpoint-card:hover {
+    transform: translateX(5px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+  }
+  
+  .sensor-item {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  
+  .sensor-item:hover {
+    transform: translateX(3px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
   }
 `;
 document.head.appendChild(style);

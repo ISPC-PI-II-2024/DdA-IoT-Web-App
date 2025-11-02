@@ -281,26 +281,47 @@ function setupRealtimeUpdates(container) {
   // Suscribirse a actualizaciones de gateway
   rtClient.subscribe("gateway_update", (data) => {
     console.log("Gateway update recibido:", data);
-    // Actualizar solo la sección de gateways
-    updateGatewayInUI(container, data.data);
+    // Usar data.payload o data.data (dependiendo del formato del mensaje)
+    const gatewayData = data.payload || data.data;
+    if (gatewayData) {
+      updateGatewayInUI(container, gatewayData);
+    } else {
+      console.warn("Gateway update sin datos válidos:", data);
+    }
   });
   
   // Suscribirse a actualizaciones de endpoint
   rtClient.subscribe("endpoint_update", (data) => {
     console.log("Endpoint update recibido:", data);
-    // Actualizar solo la sección de endpoints
-    updateEndpointInUI(container, data.data);
+    // Usar data.payload o data.data (dependiendo del formato del mensaje)
+    const endpointData = data.payload || data.data;
+    if (endpointData) {
+      updateEndpointInUI(container, endpointData);
+    } else {
+      console.warn("Endpoint update sin datos válidos:", data);
+    }
   });
   
   // Suscribirse a actualizaciones de sensor
   rtClient.subscribe("sensor_update", (data) => {
     console.log("Sensor update recibido:", data);
-    // Actualizar solo la sección de sensores
-    updateSensorInUI(container, data.data);
+    // Usar data.payload o data.data (dependiendo del formato del mensaje)
+    const sensorData = data.payload || data.data;
+    if (sensorData) {
+      updateSensorInUI(container, sensorData);
+    } else {
+      console.warn("Sensor update sin datos válidos:", data);
+    }
   });
 }
 
 function updateGatewayInUI(container, gatewayData) {
+  // Validar que gatewayData existe y tiene id
+  if (!gatewayData || !gatewayData.id) {
+    console.warn("updateGatewayInUI: Datos de gateway inválidos", gatewayData);
+    return;
+  }
+  
   const gatewayCard = container.querySelector(`.gateway-card[data-id="${gatewayData.id}"]`);
   if (gatewayCard) {
     // Actualizar datos del gateway
@@ -321,6 +342,12 @@ function updateGatewayInUI(container, gatewayData) {
 }
 
 function updateEndpointInUI(container, endpointData) {
+  // Validar que endpointData existe y tiene id
+  if (!endpointData || !endpointData.id) {
+    console.warn("updateEndpointInUI: Datos de endpoint inválidos", endpointData);
+    return;
+  }
+  
   const endpointCard = container.querySelector(`.endpoint-card[data-id="${endpointData.id}"]`);
   if (endpointCard) {
     // Actualizar datos del endpoint
@@ -342,6 +369,12 @@ function updateEndpointInUI(container, endpointData) {
 }
 
 function updateSensorInUI(container, sensorData) {
+  // Validar que sensorData existe y tiene id
+  if (!sensorData || !sensorData.id) {
+    console.warn("updateSensorInUI: Datos de sensor inválidos", sensorData);
+    return;
+  }
+  
   const sensorCard = container.querySelector(`.sensor-card[data-id="${sensorData.id}"]`);
   if (sensorCard) {
     // Actualizar datos del sensor
